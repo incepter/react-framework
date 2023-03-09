@@ -100,9 +100,9 @@ class UserResource {
   // this may alter client state if needed as well ;)
   async getUserPosts({context, match}) {
     let currentUser = context.principal
-    let user = use(axios.get(`/users/${match.id}/posts`))
+    let posts = use(axios.get(`/users/${match.id}/posts`))
 
-    return <UsersList users={users} />
+    return <UsersPosts posts={posts} />
   }
 
   @PreAuthorize // will trigger some authorizationFilter on this resource
