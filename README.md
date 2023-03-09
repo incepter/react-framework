@@ -74,6 +74,9 @@ In `CSR`, the `use` hook will either apply hydration or suspend until it loads d
  * - Decide on the structure on the bundle (client, server, both ...)
  * - code-split each API as an entrypoint and generate its standalone package
  * - prepare entrypoints
+ * # Runtime phase
+ * - boot the dispatcher (detect env and capabilities, loads apis and filters)
+ * - intercept requests etc
  *
  */
 @Resource(path="/users")
