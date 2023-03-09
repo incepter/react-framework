@@ -13,7 +13,7 @@ class UsersResource {
   @Render // returns react elements / html
   @PageRoot // declares this as a PageRoot (a full client page)
   @ProgressiveEnhancement // ship html, then js in a second round if needed
-  @GetMapping(path = "/") // makes this reachable via /users/
+  @GetMapping({path: "/", produces: "text/html"}) // makes this reachable via /users/
   async getUsersList({context, query}) {
     let users = use(axios.get())
     // If this is not an RSC, hooks will be possible here
@@ -81,7 +81,7 @@ class UserResource {
   @Render // returns react elements / html
   @PageRoot // declares this as a PageRoot (a full client page)
   @ProgressiveEnhancement // ship html, then js in a second round if needed
-  @GetMapping(path = "/") // makes this reachable via /users
+  @GetMapping({path: "/", produces: "text/html"}) // makes this reachable via /users/
   async getUsersList({context, query}) {
     let currentUser = context.principal
     let users = use(axios.get())
@@ -91,7 +91,7 @@ class UserResource {
 
   @Render // returns react elements / html
   @ProgressiveEnhancement // ship html, then js in a second round if needed
-  @GetMapping(path = "/:id/posts") // makes this reachable via /users/14/posts
+  @GetMapping({path: "/:id/posts", produces: "text/html"}) // makes this reachable via /users/14/posts
   // Without page root, this is a PageFragment; means can be CSRed or SSRed
   // or RSCed alone without any need to re-render the full page.
   // this may alter client state if needed as well ;)
@@ -103,7 +103,7 @@ class UserResource {
   }
 
   @PreAuthorize // will trigger some authorizationFilter on this resource
-  @GetMapping(path = "/me", produces='application/json')
+  @GetMapping({ path: "/me", produces: 'application/json' })
   async getCurrentUserDetails({context}) {
     return use(getUserDetails(context.principal.id))
   }
