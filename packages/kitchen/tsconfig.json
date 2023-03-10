@@ -1,0 +1,21 @@
+{
+  "ts-node": {
+    "compilerOptions": {
+      "module": "commonjs"
+    }
+  },
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["node"],
+    "experimentalDecorators": true,
+    "paths": {
+      "tslib": ["node_modules/tslib"]
+    }
+  },
+  "include": ["src"],
+  "exclude": [
+    "node_modules",
+    "src/index-prod.js"
+  ]
+}

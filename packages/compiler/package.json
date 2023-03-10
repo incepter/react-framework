@@ -1,0 +1,23 @@
+{
+  "name": "react-limitless-compiler",
+  "version": "0.0.0",
+  "description": "The next-gen react framework compiler",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/incepter/react-framework.git"
+  },
+  "author": "incepter",
+  "license": "GPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/incepter/react-framework/issues"
+  },
+  "homepage": "https://github.com/incepter/react-framework#readme",
+  "files": [
+    "index.js",
+    "package.json"
+  ]
+}

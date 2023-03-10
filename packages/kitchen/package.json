@@ -1,0 +1,43 @@
+{
+  "name": "ssr",
+  "version": "1.0.0",
+  "sideEffects": false,
+  "main": "src/server/index.tsx",
+  "license": "MIT",
+  "scripts": {
+    "clear": "rimraf build",
+    "build:server": "webpack --config webpack.server.js",
+    "start:server": "node server-build/bundle.js",
+    "dev:server": "nodemon --watch src/server --exec \"run-s clear build:server start:server\"",
+    "dev:client": "webpack serve --config webpack.client.js",
+    "dev": "npm-run-all --parallel dev:client dev:server",
+    "d": "pnpm ts-node src/build.ts"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "isomorphic-fetch": "^3.0.0",
+    "node-fetch": "^3.3.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.21.0",
+    "@babel/preset-env": "^7.20.2",
+    "@babel/preset-react": "^7.18.6",
+    "@types/express": "^4.17.17",
+    "@types/node": "^18.14.6",
+    "babel-loader": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "lodash": "^4.17.21",
+    "nodemon": "^2.0.21",
+    "npm-run-all": "^4.1.5",
+    "rimraf": "^4.3.1",
+    "ts-loader": "^9.4.2",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.9.5",
+    "webpack": "^5.76.0",
+    "webpack-cli": "^5.0.1",
+    "webpack-dev-server": "^4.11.1",
+    "webpack-node-externals": "^3.0.0"
+  }
+}
