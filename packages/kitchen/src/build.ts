@@ -1,6 +1,5 @@
 import * as ts from 'typescript';
-import * as path from 'path';
-import * as fs from 'fs';
+import {findAllResources} from "./me";
 
 // Read the tsconfig.json file
 const entry = "src/new/newIndex.tsx";
@@ -79,6 +78,7 @@ function getDecoratorName(decorator: ts.Decorator, sourceFile) {
 
 for (const sourceFile of program.getSourceFiles()) {
   if (!sourceFile.isDeclarationFile) {
-    findNodesWithCustomDecorator(sourceFile);
+    findAllResources(sourceFile);
+    // findNodesWithCustomDecorator(sourceFile);
   }
 }
