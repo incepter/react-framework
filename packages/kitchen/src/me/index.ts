@@ -1,5 +1,5 @@
 import * as ts from "typescript"
-import {Decorators, PathDecorators} from "./decorators";
+import {Decorators, PathDecorators, Resource} from "./decorators";
 
 type ResourceDeclaration = {
   path: string,
@@ -25,7 +25,7 @@ type ApiCapability = {
 }
 
 
-function lookupResourceAPIs(
+export function lookupResourceAPIs(
   parentPath: string,
   node: ts.ClassDeclaration,
   sourceFile: ts.SourceFile
@@ -40,49 +40,64 @@ function lookupResourceAPIs(
         name: ts.getNameOfDeclaration(member)!.getText(sourceFile)
       }
 
+      let otherModifiers: ts.ModifierLike[] = []
+
       for (let modifier of member.modifiers) {
         if (ts.isDecorator(modifier)) {
           let expression = modifier.expression
           if (ts.isCallExpression(expression) && ts.isIdentifier(expression.expression)) {
-            let name = expression.expression.escapedText;
+            let name = expression.expression.escapedText as string;
             if (Decorators[name!]) {
-              let path = extractProperty(modifier, "path", sourceFile);
-              if (PathDecorators[name!]) {
-                if (!path) {
-                  path = "/"
+              if (Decorators[name!]) {
+                let path = extractProperty(modifier, "path", sourceFile);
+                if (PathDecorators[name!]) {
+                  if (!path) {
+                    path = "/"
+                  }
+                  api.method = name!;
+                  api.path = `${JSON.parse(parentPath)}${path === "/" ? "/" : JSON.parse(path)}`
                 }
-                api.method = name!;
-                api.path = `${JSON.parse(parentPath)}${path === "/" ? "/" : JSON.parse(path)}`
+                api.capabilities!.push({
+                  kind: name!,
+                  config: expression.arguments[0]?.getFullText(sourceFile)
+                })
               }
-              api.capabilities!.push({
-                kind: name!,
-                config: expression.arguments[0]?.getFullText(sourceFile)
-              })
+            } else {
+              otherModifiers.push(modifier)
             }
           }
         }
       }
       output.push(api)
+      // @ts-ignore
+      member.modifiers = otherModifiers
     }
   }
   return output;
 }
 
-function getResourceDecoratorFromClass(node: ts.ClassDeclaration, sourceFile: ts.SourceFile): ResourceDeclaration | null {
+export function getResourceDecoratorFromClass(node: ts.ClassDeclaration, sourceFile: ts.SourceFile): ResourceDeclaration | null {
   let {modifiers} = node
   if (!modifiers) {
     return null
   }
+
+  let otherModifiers: ts.ModifierLike[] = []
+
   for (let modifier of modifiers) {
     if (ts.isDecorator(modifier)) {
       let expression = modifier.expression
       if (ts.isCallExpression(expression) && ts.isIdentifier(expression.expression)) {
-        let name = expression.expression.escapedText
-        if (Decorators[name!]) {
+        let name = expression.expression.escapedText as string
+        if (name === Resource.name) {
           let path = extractProperty(modifier, "path", sourceFile);
           if (!path && PathDecorators[name!]) {
             path = "/"
           }
+
+          // @ts-ignore
+          node.modifiers = node.modifiers!.filter(t => t !== modifier)
+
           return {
             path: JSON.parse(path!),
             // target: node,
@@ -112,24 +127,27 @@ function extractProperty(node: ts.Decorator, propName: string, src: ts.SourceFil
   return undefined
 }
 
+export function processNode(node: ts.Node) {
+  console.log('node', node)
+  if (ts.isClassDeclaration(node)) {
+    let config = getResourceDecoratorFromClass(node, node.getSourceFile())
+    if (!config) {
+      return;
+    }
+
+    // resources[config.path] = config
+    console.log('class processed:', config)
+    return config;
+    // let declaredMappings = getDeclaredMappings(node, sourceFile)
+    // let resourceMappings = inferResourceMappings(declaredMappings)
+    //
+    // removeInternalDecorators(node, declaredMappings)
+    // registerResource(config, resourceMappings, sourceFile)
+  }
+}
 
 export function findAllResources(sourceFile: ts.SourceFile) {
   let resources = {}
-  ts.forEachChild(sourceFile, function walk(node: ts.Node): void {
-    if (ts.isClassDeclaration(node)) {
-      let config = getResourceDecoratorFromClass(node, sourceFile)
-      if (!config) {
-        return;
-      }
-
-      resources[config.path] = config
-      console.log('class processed:', config)
-      // let declaredMappings = getDeclaredMappings(node, sourceFile)
-      // let resourceMappings = inferResourceMappings(declaredMappings)
-      //
-      // removeInternalDecorators(node, declaredMappings)
-      // registerResource(config, resourceMappings, sourceFile)
-    }
-  })
+  ts.forEachChild(sourceFile, processNode)
   // console.log('finished', resources)
 }

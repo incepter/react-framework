@@ -1,84 +1,71 @@
+import * as path from 'path';
 import * as ts from 'typescript';
-import {findAllResources} from "./me";
-
-// Read the tsconfig.json file
-const entry = "src/new/newIndex.tsx";
-const configFileName = "tsconfig.json";
-const configFile = ts.readConfigFile(configFileName, ts.sys.readFile);
-
-// Define the custom decorator name to detect
-const classDecorators = ['Resource'];
-const functionDecorators = ['Render', 'GetMapping', 'PreAuthorize'];
-
-// Load the tsconfig.json file
-// const configFile = ts.readConfigFile(configFileName, ts.sys.readFile);
-const compilerOptions = ts.convertCompilerOptionsFromJson(
-  configFile.config.compilerOptions,
-  process.cwd()
-).options;
+import {getResourceDecoratorFromClass, processNode} from "./me";
 
 
-// Create the program using the compiler options and file names from the tsconfig.json file
-const fileNames = configFile.config.include;
-const program = ts.createProgram([entry], compilerOptions);
-
-// Find all nodes with the custom decorator and log their location
-function findNodesWithCustomDecorator(sourceFile: ts.SourceFile) {
-  ts.forEachChild(sourceFile, function walk(node: ts.Node): void {
+function reactLimitlessTransformer(context: ts.TransformationContext) {
+  function visit(node: ts.Node): ts.Node {
     if (ts.isClassDeclaration(node)) {
-      let decorators = node.modifiers?.filter(t => t.kind === ts.SyntaxKind.Decorator);
-      if (decorators) {
-        let matchingDecorators = decorators.filter(decorator => {
-          if (ts.isDecorator(decorator)) {
-            let name = getDecoratorName(decorator, sourceFile);
-            if (name) {
-              return classDecorators.includes(name)
-            }
-          }
-          return false;
-        });
-        if (matchingDecorators.length > 0) {
-          // @ts-ignore
-          // console.log(`${sourceFile.fileName}: has ${matchingDecorators.length} matches`, matchingDecorators[0].expression.expression);
-        }
-      }
-    } else if (ts.isMethodDeclaration(node)) {
-      let decorators = node.modifiers?.filter(t => t.kind === ts.SyntaxKind.Decorator);
-      if (decorators) {
-        let matchingDecorators = decorators.filter(decorator => {
-          if (ts.isDecorator(decorator)) {
-            let name = getDecoratorName(decorator, sourceFile);
-            if (name) {
-              return functionDecorators.includes(name)
-            }
-          }
-          return false;
-        });
-        if (matchingDecorators.length > 0) {
-          // @ts-ignore
-          console.log(`${sourceFile.fileName}: has ${matchingDecorators.length} matches`, matchingDecorators.map(t => getDecoratorName(t, sourceFile)));
-        }
+      console.log('__found a class')
+      let config = getResourceDecoratorFromClass(node, node.getSourceFile())
+      if (config) {
+        console.log('class processed:', config)
       }
     }
-    ts.forEachChild(node, walk);
-  });
-}
-
-function getDecoratorName(decorator: ts.Decorator, sourceFile) {
-  let expression = decorator.expression;
-  if (ts.isIdentifier(expression)) {
-    return expression.getText(sourceFile);
-  } else if (ts.isCallExpression(expression)) {
-    return expression.expression.getText(sourceFile);
+    return ts.visitEachChild(node, visit, context);
   }
-  return null
-}
 
-// Find all nodes with the custom decorator in each source file in the program
-
-for (const sourceFile of program.getSourceFiles()) {
-  if (!sourceFile.isDeclarationFile) {
-    findAllResources(sourceFile);
-    // findNodesWithCustomDecorator(sourceFile);
+  return (node: ts.SourceFile) => {
+    return ts.visitNode(node, visit);
   }
 }
+
+let rootDirectory = path.resolve(__dirname, '..');
+let tsConfigFile = path.join(rootDirectory, 'tsconfig.json');
+let configFileName = "tsconfig.json";
+let configFile = ts.readConfigFile(configFileName, ts.sys.readFile);
+let compilerOptions = ts.convertCompilerOptionsFromJson(configFile.config.compilerOptions, process.cwd()).options;
+let host = ts.createCompilerHost(compilerOptions);
+// @ts-ignore
+const parsedCommandLine = ts.getParsedCommandLineOfConfigFile(tsConfigFile, {}, ts.sys)!;
+
+let program = ts.createProgram({
+  host,
+  options: parsedCommandLine.options,
+  rootNames: parsedCommandLine.fileNames,
+});
+
+// let program = ts.createProgram({
+//   host,
+//   options: compilerOptions,
+//   rootNames: configFile.config.include,
+// });
+
+let transformers: ts.CustomTransformers = {
+  before: [reactLimitlessTransformer]
+};
+
+let {
+  emitSkipped,
+  diagnostics
+} = program.emit(undefined, undefined, undefined, undefined, transformers);
+
+if (emitSkipped) {
+  console.error('Compilation failed');
+  process.exit(1);
+}
+
+diagnostics.forEach(diagnostic => {
+  console.error(diagnostic.messageText);
+});
+
+
+// for (let sourceFile of program.getSourceFiles()) {
+//   console.log('__')
+//   if (!sourceFile.isDeclarationFile) {
+//     // findAllResources(sourceFile);
+//     // findNodesWithCustomDecorator(sourceFile);
+//   }
+// }
+
+

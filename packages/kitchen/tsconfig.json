@@ -7,11 +7,9 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "baseUrl": ".",
+    "outDir": "build",
     "types": ["node"],
-    "experimentalDecorators": true,
-    "paths": {
-      "tslib": ["node_modules/tslib"]
-    }
+    "experimentalDecorators": true
   },
   "include": ["src"],
   "exclude": [
