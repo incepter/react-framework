@@ -4,7 +4,7 @@ import {Get, Render, Resource} from "../decorators";
 export default class PetsResource {
   @Render()
   @Get({path: "/pikachu"})
-  async GetPikachu({query}) {
+  GetPikachu({query}) {
     return <div>Hello from the {query?.name}</div>
   }
 }
