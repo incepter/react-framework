@@ -2,27 +2,20 @@ import * as React from "react";
 import {get} from "lodash"
 import {Get, Post, PreAuthorize, Render, Resource} from "./decorators";
 import Users from "./components/Users";
+import UserPosts from "./components/UserPosts";
 
 @Resource({path: "/users"})
 export class UserResource {
-
   @Get()
   @Render()
   GetUsers({query}) {
     return <Users />
   }
-
-  @PreAuthorize()
-  @Post({path: "/", produces: "application/json"})
-  AddUser({body}) {
-    return {json: true}
-  }
-
   @Render()
   @PreAuthorize()
   @Get({path: "/:id/posts"})
-  EditUser({body}) {
-    return <ul>Haha</ul>
+  UserPosts({body}) {
+    return <UserPosts />
   }
 }
 

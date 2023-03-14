@@ -6,28 +6,27 @@ import {
   Get,
   Patch,
   Post,
+  PreAuthorize,
   Put,
   Render
 } from "../src/decorators";
 import {
-  ClassDeclaration, Decorator, MethodDeclaration,
-  ObjectLiteralExpression, Project,
+  ClassDeclaration,
+  Decorator,
+  MethodDeclaration,
+  ObjectLiteralExpression,
+  Project,
   PropertyAssignment,
-  SourceFile, SyntaxKind
+  SourceFile,
+  SyntaxKind
 } from "ts-morph";
-
-export interface ResourceMethod {
-  name: string;
-  decorator: string;
-  path?: string;
-}
+import {addCodeToFile} from "./file-utils";
 
 export interface LimitlessResource {
   path: string,
   name: string,
-  sourceFile: SourceFile,
   node: ClassDeclaration,
-  capabilities: Record<string, Record<string, DecoratorConfig>>
+  apis: Record<string, ApiConfiguration>
 }
 
 export function getProperty(
@@ -54,9 +53,8 @@ export function getResourceClasses(sourceFile: SourceFile): LimitlessResource[] 
         let path = getProperty(configArg as ObjectLiteralExpression, 'path')
         if (path) {
           output.push({
+            apis: {},
             node: cls,
-            sourceFile,
-            capabilities: {},
             name: cls.getName(),
             path: JSON.parse(path)
           })
@@ -68,23 +66,42 @@ export function getResourceClasses(sourceFile: SourceFile): LimitlessResource[] 
   return output;
 }
 
-export interface DecoratorConfig {
+
+export type ApiConfiguration = {
   name: string,
-  kind: string,
-  path: string
+  path?: string,
+  fullPath?: string,
+  moduleName?: string,
+  modulePath?: string,
+
+  decorators: {
+    Get?: { path?: string }
+    Put?: { path?: string }
+    Post?: { path?: string }
+    Patch?: { path?: string }
+    Delete?: { path?: string }
+    Render?: { config?: string }
+  }
 }
 
-export function parseDecorator(decorator: Decorator): DecoratorConfig | undefined {
+export interface DecoratorConfigured {
+  name: string,
+  path?: string,
+  fullPath?: string,
+  modulePath?: string,
+}
+
+export function parseDecorator(
+  decorator: Decorator,
+  classConfig: LimitlessResource,
+  result: ApiConfiguration
+): DecoratorConfigured | undefined {
   let output = undefined;
   let name = decorator.getName()
   if (Decorators[name]) {
     switch (name) {
       case Render.name: {
-        output = {
-          name,
-          path: "",
-          kind: "render",
-        }
+        result.decorators.Render = {}
         break;
       }
       case Get.name:
@@ -92,6 +109,8 @@ export function parseDecorator(decorator: Decorator): DecoratorConfig | undefine
       case Delete.name:
       case Patch.name:
       case Put.name: {
+
+
         let args = decorator.getArguments();
         let configArg = args[0];
 
@@ -102,43 +121,30 @@ export function parseDecorator(decorator: Decorator): DecoratorConfig | undefine
             path = pathArg
           }
         }
+        path = JSON.stringify(path)
+
+
+        result.decorators[name] = {
+          path,
+          fullPath: `${classConfig.path}${path}`,
+        }
+        let routeAlias = `${name}_${classConfig.path}${path}`
+      }
+      case PreAuthorize.name: {
         output = {
           name,
-          kind: "api",
-          path: JSON.stringify(path)
         }
-        break;
       }
-      // case PreAuthorize.name: {
-      //
-      // }
     }
     decorator.remove()
   }
   return output;
 }
 
-function registerMethod(
-  rootDir: string,
-  project: Project,
-  className: string,
+function moveDeclarationsToFile(
   method: MethodDeclaration,
-  outDir: string,
-  capabilities: Record<string, DecoratorConfig>
+  targetFile: SourceFile,
 ) {
-
-  let methodName = method.getName();
-  let dirName = `${outDir}/${className}`;
-  fs.mkdirSync(dirName, {recursive: true});
-
-  let extension = capabilities[Render.name] ? "tsx" : "ts"
-  let filePath = path.join(dirName, `${className}_${method.getName()}.${extension}`);
-  let sourceFile = project.createSourceFile(filePath, undefined, {overwrite: true})
-
-  sourceFile.addStatements([
-    `import * as React from "react"`
-  ])
-  let importedModules = new Map<string, { importText: any, resolvedModuleSpecifier: any }>();
   method.getDescendantsOfKind(SyntaxKind.Identifier).forEach(identifier => {
     let symbol = identifier.getSymbol();
     if (symbol) {
@@ -147,18 +153,17 @@ function registerMethod(
         let importDeclaration = declaration.getFirstAncestorByKind(SyntaxKind.ImportDeclaration);
         if (importDeclaration) {
           let originalFile = method.getSourceFile()
-          let diff = sourceFile.getRelativePathTo(originalFile)
-
+          let diff = targetFile.getRelativePathTo(originalFile)
 
           let isRelative = !!importDeclaration.getModuleSpecifierSourceFile()
           let moduleSpecifier = importDeclaration.getModuleSpecifierValue();
-          let resolvedModuleSpecifier = isRelative ? sourceFile.getRelativePathAsModuleSpecifierTo(
+          let resolvedModuleSpecifier = isRelative ? targetFile.getRelativePathAsModuleSpecifierTo(
             importDeclaration.getModuleSpecifierSourceFile()?.getFilePath() ?? importDeclaration.getModuleSpecifierValue()
           ) : importDeclaration.getModuleSpecifierValue()
 
           let namespaceImport = importDeclaration.getNamespaceImport()?.getText();
 
-          sourceFile.addImportDeclaration({
+          targetFile.addImportDeclaration({
             defaultImport: importDeclaration.getDefaultImport()?.getText(),
             namespaceImport: namespaceImport ? namespaceImport.substring(namespaceImport.lastIndexOf(' as ') + 4) : undefined,
             namedImports: importDeclaration.getNamedImports()?.map(t => t.getName()),
@@ -169,9 +174,15 @@ function registerMethod(
     }
   });
 
+}
 
-  let functionNode = sourceFile.addFunction({
-    name: `original${methodName}`,
+function cloneFunctionIntoFile(
+  method: MethodDeclaration,
+  sourceFile: SourceFile,
+  functionName: string
+) {
+  return sourceFile.addFunction({
+    name: functionName,
     parameters: method.getParameters().map(param => ({
       name: param.getName(),
       type: param.getType().getText()
@@ -179,16 +190,46 @@ function registerMethod(
     returnType: method.getReturnType().getText(),
     statements: method.getStatements().map(stmt => stmt.getText())
   });
-  sourceFile.addStatements([
-    `
-export default function ${className}_${methodName}(ctx) {
-  return original${methodName}(ctx);
 }
-    `
-  ])
+
+function makeLimitilessFunction(
+  functionName: string,
+  originalFunctionName: string
+) {
+  return `export default function ${functionName}(ctx) {
+  return ${originalFunctionName}(ctx);
+}`
+}
+
+function registerMethod(
+  rootDir: string,
+  project: Project,
+  className: string,
+  method: MethodDeclaration,
+  outDir: string,
+  apiConfig: ApiConfiguration,
+) {
+  let methodName = method.getName();
+  let dirName = `${outDir}/${className}`;
+  fs.mkdirSync(dirName, {recursive: true});
+
+  let hasRender = !!apiConfig.decorators.Render
+
+  let extension = hasRender ? "tsx" : "ts"
+  let filePath = path.join(dirName, `${className}_${method.getName()}.${extension}`);
+  let sourceFile = project.createSourceFile(filePath, undefined, {overwrite: true})
+
+  if (hasRender) {
+    addCodeToFile(sourceFile, `import * as React from "react"`)
+  }
+  moveDeclarationsToFile(method, sourceFile)
+  cloneFunctionIntoFile(method, sourceFile, `original${method.getName()}`)
+  addCodeToFile(sourceFile, makeLimitilessFunction(`${className}_${methodName}`, `original${methodName}`))
+
   sourceFile.saveSync()
   let componentName = `Lazy${className}_${methodName}`;
-  let textToAppend = capabilities[Render.name] ?
+  console.log('______________', apiConfig)
+  let textToAppend = hasRender ?
     `\nexport let ${componentName} = React.lazy(() => import("./${className}/${className}_${methodName}"));`
     :
     `\nexport { default as ${componentName} } from "./${className}/${className}_${methodName}";`
@@ -197,49 +238,45 @@ export default function ${className}_${methodName}(ctx) {
     `${outDir}/index.ts`,
     textToAppend
   );
-
-
-  // let importedModules = functionNode.getImportDeclarations().map(declaration => declaration.getModuleSpecifierValue());
-  // for (let importedModule of importedModules) {
-  //   destFile.addImportDeclaration({
-  //     moduleSpecifier: importedModule
-  //   });
-  // }
-
-
+  apiConfig.moduleName = componentName
+  apiConfig.modulePath = `${outDir}/index.ts`
 }
 
 export function scanAndProcessCapabilities(
   rootDir: string,
   project: Project,
   classConfig: LimitlessResource,
-  outDir: string
-): Record<string, Record<string, DecoratorConfig>> {
-  let caps: Record<string, Record<string, DecoratorConfig>> = {}
+  outDir: string,
+): Record<string, ApiConfiguration> | undefined {
 
+  let output: Record<string, ApiConfiguration> = {}
   let classNode = classConfig.node
+
   for (let method of classNode.getMethods()) {
-    let hasCaps = false
-    let capabilities: Record<string, DecoratorConfig> = {}
+    let hasFrameworkDecorators = false
+
+    let apiConfig: ApiConfiguration = {
+      decorators: {},
+      name: method.getName(),
+    }
 
     for (let decorator of method.getDecorators()) {
-      let cap = parseDecorator(decorator)
-      if (cap) {
-        hasCaps = true
-        capabilities[cap.name] = cap
+      if (parseDecorator(decorator, classConfig, apiConfig)) {
+        hasFrameworkDecorators = true
       }
     }
-    if (hasCaps) {
-      caps[method.getName()] = capabilities
+
+    if (hasFrameworkDecorators) {
       registerMethod(
         rootDir,
         project,
         classNode.getName(),
         method,
         outDir,
-        capabilities
+        apiConfig,
       )
+      output[method.getName()] = apiConfig
     }
   }
-  return caps
+  return Object.keys(output).length > 0 ? output : undefined
 }

@@ -5,21 +5,21 @@ import {Project, SourceFile} from 'ts-morph'
 import {
   LimitlessResource,
   getResourceClasses,
-  scanAndProcessCapabilities
+  scanAndProcessCapabilities, DecoratorConfigured
 } from "./helpers";
 
 
 /** @type {import('vite').UserConfig} */
 export default function transformTsMorph(): Plugin {
+  let tempDir;
   let project: Project;
   let appConfig: LimitlessResource[] = []
-
-  let tempDir;
 
   return {
     name: 'resource-plugin',
     async configResolved(config) {
       tempDir = path.join(config.root, 'src/.limitless');
+      fs.rmSync(tempDir, {recursive: true, force: true});
       fs.mkdirSync(tempDir, {recursive: true});
 
       let filePath = path.join(tempDir, 'index.ts');
@@ -32,38 +32,19 @@ export default function transformTsMorph(): Plugin {
         let classesConfig = getResourceClasses(sourceFile)
         if (classesConfig.length > 0) {
           for (let classConfig of classesConfig) {
-            classConfig.capabilities = scanAndProcessCapabilities(
+            classConfig.apis = scanAndProcessCapabilities(
               config.root,
               project,
               classConfig,
               tempDir,
             )
-            // Object.keys(classConfig.capabilities)
-            //   .forEach(id => {
-            //     let cap = classConfig.capabilities[id]
-            //
-            //   })
             appConfig.push(classConfig)
           }
         }
       }
-
-
-
-      // console.log('GOT THEM', appConfig)
       // @ts-ignore
       config.build.rollupOptions.input.limitless = tempDir;
     },
-    // async transform(code, id) {
-    //   if (!id.endsWith('.tsx') && !id.endsWith('.ts')) {
-    //     return null;
-    //   }
-    //   console.log('___________got ', id)
-    //   if (!id.endsWith('.tsx')) {
-    //     return null;
-    //   }
-    //
-    // },
   };
 
 }
