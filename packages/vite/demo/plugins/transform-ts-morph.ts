@@ -17,7 +17,6 @@ export default function transformTsMorph(): Plugin {
   return {
     name: 'resource-plugin',
     async configResolved(config) {
-      console.log('___________xxxxxxxxxxxx_______________')
       tempDir = path.join(config.root, 'src/.limitless');
       fs.rmSync(tempDir, {recursive: true, force: true});
       fs.mkdirSync(tempDir, {recursive: true});

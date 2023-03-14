@@ -1,5 +1,5 @@
 import React from "react";
 
 export default function UserPosts() {
-  return <div>Hello!</div>
+  return <div>Hello from user posts !!!!</div>
 }

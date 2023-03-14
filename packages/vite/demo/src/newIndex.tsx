@@ -25,14 +25,14 @@ export class PostResource {
   @Get()
   @Render()
   GetPosts({query}) {
-    return <div>Hello! alhmar !!!!</div>
+    return <div>Hello! /posts root!</div>
   }
 
   @Render()
   @PreAuthorize()
   @Post({path: "/", produces: "application/json"})
   AddPost({body}) {
-    return {json: true}
+    return <div>Add post</div>
   }
 
   @Render()
@@ -40,6 +40,6 @@ export class PostResource {
   @Get({path: "/:id"})
   EditPost({query}) {
     let t = get({}, "lol")
-    return <ul>Haha</ul>
+    return <ul>edit post</ul>
   }
 }
