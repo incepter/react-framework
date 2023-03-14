@@ -4,11 +4,16 @@ import transformTsMorph from "./plugins/transform-ts-morph";
 
 export default defineConfig({
   build: {
-    minify: false
+    minify: false,
+    rollupOptions: {
+      input: {
+        index: "index.html",
+      }
+    }
   },
   optimizeDeps: {
-    include: ['src/**/*.{ts,tsx}'],
-    entries: ['src/**/*.{ts,tsx}']
+    include: ['src/**/*.{ts,tsx}', ".limitless/**/*.{ts,tsx}"],
+    entries: ['src/**/*.{ts,tsx}', ".limitless/**/*.{ts,tsx}"]
   },
   plugins: [
     transformTsMorph(),

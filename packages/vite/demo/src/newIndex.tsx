@@ -1,25 +1,27 @@
 import * as React from "react";
+import {get} from "lodash"
 import {Get, Post, PreAuthorize, Render, Resource} from "./decorators";
+import Users from "./components/Users";
 
 @Resource({path: "/users"})
 export class UserResource {
 
   @Get()
   @Render()
-  async GetUsers({query}) {
-    return <div>Hello!</div>
+  GetUsers({query}) {
+    return <Users />
   }
 
   @PreAuthorize()
   @Post({path: "/", produces: "application/json"})
-  async AddUser({body}) {
+  AddUser({body}) {
     return {json: true}
   }
 
   @Render()
   @PreAuthorize()
   @Get({path: "/:id/posts"})
-  async EditUser({body}) {
+  EditUser({body}) {
     return <ul>Haha</ul>
   }
 }
@@ -29,20 +31,21 @@ export class PostResource {
 
   @Get()
   @Render()
-  async GetPosts({query}) {
+  GetPosts({query}) {
     return <div>Hello!</div>
   }
 
   @PreAuthorize()
   @Post({path: "/", produces: "application/json"})
-  async AddPost({body}) {
+  AddPost({body}) {
     return {json: true}
   }
 
   @Render()
   @PreAuthorize()
   @Get({path: "/:id"})
-  async EditPost() {
+  EditPost({query}) {
+    let t = get({}, "lol")
     return <ul>Haha</ul>
   }
 }
