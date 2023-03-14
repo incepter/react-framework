@@ -39,7 +39,8 @@ export class PostResource {
   @PreAuthorize()
   @Get({path: "/:id"})
   EditPost({query}) {
-    let t = get({}, "lol")
+    // await new Promise(res => setTimeout(res, 2000))
+    console.log('resolve')
     return <ul>edit post</ul>
   }
 }

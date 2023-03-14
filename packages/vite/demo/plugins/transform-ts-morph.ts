@@ -85,7 +85,9 @@ ${routing}
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
+    <React.Suspense fallback="loading chunk">
+      <RouterProvider router={router} />
+    </React.Suspense>
   </React.StrictMode>
 )
   `

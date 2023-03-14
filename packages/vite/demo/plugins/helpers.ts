@@ -98,10 +98,13 @@ export function parseDecorator(
 ): DecoratorConfigured | undefined {
   let output = undefined;
   let name = decorator.getName()
+
   if (Decorators[name]) {
     switch (name) {
       case Render.name: {
+        output = {}
         result.decorators.Render = {}
+        decorator.remove()
         break;
       }
       case Get.name:
@@ -109,8 +112,6 @@ export function parseDecorator(
       case Delete.name:
       case Patch.name:
       case Put.name: {
-
-
         let args = decorator.getArguments();
         let configArg = args[0];
 
@@ -126,14 +127,17 @@ export function parseDecorator(
         result.path = path;
         result.fullPath = `${classConfig.path}${path}`
         result.decorators[name] = {}
+        decorator.remove()
+        output = {}
+        break;
       }
       case PreAuthorize.name: {
-        output = {
-          name,
-        }
+        result.name = name;
+        output = {}
+        decorator.remove()
+        break;
       }
     }
-    decorator.remove()
   }
   return output;
 }
@@ -178,8 +182,10 @@ function cloneFunctionIntoFile(
   sourceFile: SourceFile,
   functionName: string
 ) {
+
   return sourceFile.addFunction({
     name: functionName,
+    isAsync: method.isAsync(),
     parameters: method.getParameters().map(param => ({
       name: param.getName(),
       type: param.getType().getText()
@@ -191,12 +197,16 @@ function cloneFunctionIntoFile(
 
 function makeLimitilessFunction(
   functionName: string,
-  originalFunctionName: string
+  originalFunctionName: string,
+  routePath: string
 ) {
-  return `export default function ${functionName}(ctx) {
-  return ${originalFunctionName}(ctx);
+  return `
+// ROUTE = ${routePath}
+export default function ${functionName}(ctx) {
+  return ${originalFunctionName}(ctx)
 }`
 }
+
 
 function registerMethod(
   rootDir: string,
@@ -221,7 +231,7 @@ function registerMethod(
   }
   moveDeclarationsToFile(method, sourceFile)
   cloneFunctionIntoFile(method, sourceFile, `original${method.getName()}`)
-  addCodeToFile(sourceFile, makeLimitilessFunction(`${className}_${methodName}`, `original${methodName}`))
+  addCodeToFile(sourceFile, makeLimitilessFunction(`${className}_${methodName}`, `original${methodName}`, apiConfig.fullPath))
 
   sourceFile.saveSync()
   let componentName = `Lazy${className}_${methodName}`;
@@ -247,6 +257,7 @@ export function scanAndProcessCapabilities(
 
   let output: Record<string, ApiConfiguration> = {}
   let classNode = classConfig.node
+
 
   for (let method of classNode.getMethods()) {
     let hasFrameworkDecorators = false
