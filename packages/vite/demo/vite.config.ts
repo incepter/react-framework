@@ -4,7 +4,7 @@ import transformTsMorph from "./plugins/transform-ts-morph";
 
 export default defineConfig({
   build: {
-    minify: false,
+    // minify: false,
     rollupOptions: {
       input: {
         index: "index.html",
