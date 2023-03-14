@@ -25,9 +25,10 @@ export class PostResource {
   @Get()
   @Render()
   GetPosts({query}) {
-    return <div>Hello!</div>
+    return <div>Hello! alhmar !!!!</div>
   }
 
+  @Render()
   @PreAuthorize()
   @Post({path: "/", produces: "application/json"})
   AddPost({body}) {

@@ -11,10 +11,6 @@ export default defineConfig({
       }
     }
   },
-  optimizeDeps: {
-    include: ['src/**/*.{ts,tsx}', ".limitless/**/*.{ts,tsx}"],
-    entries: ['src/**/*.{ts,tsx}', ".limitless/**/*.{ts,tsx}"]
-  },
   plugins: [
     transformTsMorph(),
     react()

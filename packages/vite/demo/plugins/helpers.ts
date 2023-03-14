@@ -121,14 +121,11 @@ export function parseDecorator(
             path = pathArg
           }
         }
-        path = JSON.stringify(path)
 
-
-        result.decorators[name] = {
-          path,
-          fullPath: `${classConfig.path}${path}`,
-        }
-        let routeAlias = `${name}_${classConfig.path}${path}`
+        path = JSON.parse(path)
+        result.path = path;
+        result.fullPath = `${classConfig.path}${path}`
+        result.decorators[name] = {}
       }
       case PreAuthorize.name: {
         output = {
@@ -228,7 +225,6 @@ function registerMethod(
 
   sourceFile.saveSync()
   let componentName = `Lazy${className}_${methodName}`;
-  console.log('______________', apiConfig)
   let textToAppend = hasRender ?
     `\nexport let ${componentName} = React.lazy(() => import("./${className}/${className}_${methodName}"));`
     :
@@ -239,7 +235,7 @@ function registerMethod(
     textToAppend
   );
   apiConfig.moduleName = componentName
-  apiConfig.modulePath = `${outDir}/index.ts`
+  apiConfig.modulePath = `./index`
 }
 
 export function scanAndProcessCapabilities(
