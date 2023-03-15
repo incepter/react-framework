@@ -1,11 +1,11 @@
 import path from 'path'
 import fs from 'fs'
 import {Plugin} from 'vite'
-import {Project, SourceFile} from 'ts-morph'
+import {Project} from 'ts-morph'
 import {
-  LimitlessResource,
   getResourceClasses,
-  scanAndProcessCapabilities, DecoratorConfigured
+  LimitlessResource,
+  scanAndProcessCapabilities
 } from "./helpers";
 
 /** @type {import('vite').UserConfig} */
@@ -31,25 +31,12 @@ export default function transformTsMorph(): Plugin {
         let classesConfig = getResourceClasses(sourceFile)
         if (classesConfig.length > 0) {
           for (let classConfig of classesConfig) {
-            classConfig.apis = scanAndProcessCapabilities(
-              config.root,
-              project,
-              classConfig,
-              tempDir,
-            )
+            classConfig.apis = scanAndProcessCapabilities(config.root, project, classConfig, tempDir,)
             appConfig.push(classConfig)
           }
         }
       }
 
-      let routes = {}
-      for (let config of appConfig) {
-        if (!routes[config.path]) {
-          routes[config.path] = {
-            path: config.path,
-          }
-        }
-      }
 
       fs.appendFileSync(
         `${tempDir}/main.tsx`,
@@ -59,16 +46,15 @@ export default function transformTsMorph(): Plugin {
       config.build.rollupOptions.input.limitless = tempDir;
     },
   };
-
 }
 
 function constructClientSideApp(appConfig: LimitlessResource[]) {
   let importsString = ``
   let routing = `let router = createBrowserRouter([`
 
-  appConfig.forEach(current =>  {
+  appConfig.forEach(current => {
     Object.values(current.apis).forEach(api => {
-      if (api.path && api.moduleName && api.modulePath) {
+      if (typeof api.path === "string" && api.moduleName && api.modulePath) {
         importsString += `import { ${api.moduleName} } from "${api.modulePath}";\n`;
         routing += `{ path: "${api.fullPath}", element: <${api.moduleName} /> },`
       }

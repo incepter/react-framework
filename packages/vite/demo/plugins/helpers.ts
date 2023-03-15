@@ -118,7 +118,7 @@ export function parseDecorator(
         let path = '"/"';
         if (configArg && configArg.getKind() === SyntaxKind.ObjectLiteralExpression) {
           let pathArg = getProperty(configArg as ObjectLiteralExpression, 'path')
-          if (pathArg) {
+          if (typeof pathArg === "string") {
             path = pathArg
           }
         }
