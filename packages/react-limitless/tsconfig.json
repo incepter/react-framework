@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "types": ["node", "jest"],
+    "paths": {
+      "tslib": ["node_modules/tslib"]
+    },
+  },
+  "include": ["src"],
+  "exclude": [
+    "node_modules",
+  ]
+}

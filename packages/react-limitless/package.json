@@ -19,5 +19,21 @@
   "files": [
     "index.js",
     "package.json"
-  ]
+  ],
+  "peerDependencies": {
+    "@types/node": "^18.14.6",
+    "async-states": "^1.1.1",
+    "react": "^18.2.0",
+    "react-async-states": "^1.1.1",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.14.6",
+    "async-states": "^1.1.1",
+    "react": "^18.2.0",
+    "react-async-states": "^1.1.1",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.9.0"
+  }
 }
