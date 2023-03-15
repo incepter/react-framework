@@ -87,18 +87,18 @@ function getAndBootFilters(config: LimitlessApplicationConfig) {
 //   }
 // }
 
-type LimitlessContext = {
-  query?: string,
-  request?: Request,
-  response?: Response,
-  body?: ReadableStream<any>,
-  match?: Record<string, string>,
-}
-
-type TT = {
-  getCurrentContext(): LimitlessContext,
-  run(config: LimitlessApplicationConfig): LimitlessApplication,
-}
+// type LimitlessContext = {
+//   query?: string,
+//   request?: Request,
+//   response?: Response,
+//   body?: ReadableStream<any>,
+//   match?: Record<string, string>,
+// }
+//
+// type TT = {
+//   getCurrentContext(): LimitlessContext,
+//   run(config: LimitlessApplicationConfig): LimitlessApplication,
+// }
 
 export function Application({children}) {
   return (
