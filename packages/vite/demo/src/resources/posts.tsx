@@ -21,9 +21,15 @@ export class PostResource {
   @Render()
   @PreAuthorize()
   @Get({path: "/:id"})
-  EditPost({query}) {
-    // await new Promise(res => setTimeout(res, 2000))
-    console.log('resolve')
-    return <ul>edit post</ul>
+  async PostDetails({query}) {
+    let posts = await fetch('https://jsonplaceholder.typicode.com/posts')
+      .then(res => res.json())
+    return (
+      <details open>
+        <pre>
+          {JSON.stringify(posts, null, 4)}
+        </pre>
+      </details>
+    )
   }
 }

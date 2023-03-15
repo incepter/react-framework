@@ -4,10 +4,13 @@ export type ResourceConfig = {
 
 export function Resource(config: ResourceConfig) {
   return function (constructor: Function) {
-    // resources.set(constructor, config)
   }
 }
 
+export function Configuration() {
+  return function (constructor: Function) {
+  }
+}
 
 export type ResourceMappingConfig = {
   path?: string,
@@ -15,31 +18,55 @@ export type ResourceMappingConfig = {
 }
 
 export function Render() {
-  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {};
-}
-export function Get(config?: ResourceMappingConfig) {
-  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {};
-}
-export function Post(config?: ResourceMappingConfig) {
-  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {};
-}
-export function Patch(config?: ResourceMappingConfig) {
-  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {};
-}
-export function Delete(config?: ResourceMappingConfig) {
-  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {};
-}
-export function Put(config?: ResourceMappingConfig) {
-  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {};
+  return function (
+    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  };
 }
 
+export function Bean() {
+  return function (
+    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  };
+}
+
+export function Get(config?: ResourceMappingConfig) {
+  return function (
+    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  };
+}
+
+export function Post(config?: ResourceMappingConfig) {
+  return function (
+    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  };
+}
+
+export function Patch(config?: ResourceMappingConfig) {
+  return function (
+    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  };
+}
+
+export function Delete(config?: ResourceMappingConfig) {
+  return function (
+    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  };
+}
+
+export function Put(config?: ResourceMappingConfig) {
+  return function (
+    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  };
+}
 
 export type PreAuthorizeConfig = {
   hasRole?: ({principal}) => boolean
 }
 
 export function PreAuthorize(config?: PreAuthorizeConfig) {
-  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {};
+  return function (
+    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  };
 }
 
 export let Decorators = {

@@ -3,16 +3,19 @@ import fs from 'fs'
 import {Plugin} from 'vite'
 import {Project} from 'ts-morph'
 import {
-  getResourceClasses,
+  constructClientSideApp,
+  getLimitlessAPIFromFile,
   LimitlessResource,
+  parseProjectResources,
   scanAndProcessCapabilities
 } from "./helpers";
+
 
 /** @type {import('vite').UserConfig} */
 export default function transformTsMorph(): Plugin {
   let tempDir;
+  let devServer;
   let project: Project;
-  let appConfig: LimitlessResource[] = []
 
   return {
     name: 'resource-plugin',
@@ -27,54 +30,39 @@ export default function transformTsMorph(): Plugin {
       project = new Project();
       let sources = project.addSourceFilesAtPaths(config.root + '/src/**/*.tsx');
 
+      let resources: LimitlessResource[] = []
       for (let sourceFile of sources) {
-        let classesConfig = getResourceClasses(sourceFile)
-        if (classesConfig.length > 0) {
-          for (let classConfig of classesConfig) {
-            classConfig.apis = scanAndProcessCapabilities(config.root, project, classConfig, tempDir,)
-            appConfig.push(classConfig)
+        let fileAPI = getLimitlessAPIFromFile(sourceFile);
+
+        // if (fileAPI.configurations.length) {
+        //   parseProjectConfiguration(fileAPI.configurations)
+        // }
+        if (fileAPI.resources.length) {
+          let thisFileResources = parseProjectResources(fileAPI.resources)
+          for (let fileResource of thisFileResources) {
+            fileResource.apis = scanAndProcessCapabilities(config.root, project, fileResource, tempDir)
           }
+          resources = resources.concat(thisFileResources)
         }
+
+        //
+        // let classesConfig = getResourceClasses(sourceFile)
+        // if (classesConfig.length > 0) {
+        //
+        //   for (let classConfig of classesConfig) {
+        //     classConfig.apis = scanAndProcessCapabilities(config.root, project, classConfig, tempDir)
+        //     appConfig.push(classConfig)
+        //   }
+        // }
       }
 
 
       fs.appendFileSync(
         `${tempDir}/main.tsx`,
-        constructClientSideApp(appConfig)
+        constructClientSideApp(resources)
       )
       // @ts-ignore
       config.build.rollupOptions.input.limitless = tempDir;
     },
   };
-}
-
-function constructClientSideApp(appConfig: LimitlessResource[]) {
-  let importsString = ``
-  let routing = `let router = createBrowserRouter([`
-
-  appConfig.forEach(current => {
-    Object.values(current.apis).forEach(api => {
-      if (typeof api.path === "string" && api.moduleName && api.modulePath) {
-        importsString += `import { ${api.moduleName} } from "${api.modulePath}";\n`;
-        routing += `{ path: "${api.fullPath}", element: <${api.moduleName} /> },`
-      }
-    })
-  })
-  routing += '])'
-
-
-  return `import * as React from "react";
-import ReactDOM from "react-dom/client";
-import { createBrowserRouter, RouterProvider } from "react-router-dom"
-${importsString}
-${routing}
-
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <React.StrictMode>
-    <React.Suspense fallback="loading chunk">
-      <RouterProvider router={router} />
-    </React.Suspense>
-  </React.StrictMode>
-)
-  `
 }

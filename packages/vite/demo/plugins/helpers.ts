@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import {
+  Configuration,
   Decorators,
   Delete,
   Get,
@@ -8,7 +9,8 @@ import {
   Post,
   PreAuthorize,
   Put,
-  Render
+  Render,
+  Resource
 } from "../src/decorators";
 import {
   ClassDeclaration,
@@ -38,6 +40,61 @@ export function getProperty(
   return pathProp.getInitializer()?.getText()
 }
 
+
+type ResourceDef = {
+  decorator: Decorator,
+  node: ClassDeclaration,
+}
+
+type LimitlessFile = {
+  resources: ResourceDef[],
+  configurations: ResourceDef[],
+}
+
+export function getLimitlessAPIFromFile(sourceFile: SourceFile): LimitlessFile {
+  let classes = sourceFile.getClasses()
+  let resources: ResourceDef[] = []
+  let configurations: ResourceDef[] = []
+
+  for (let cls of classes) {
+    for (let decorator of cls.getDecorators()) {
+      if (decorator.getName() === Resource.name) {
+        resources.push({node: cls, decorator})
+        continue
+      }
+      if (decorator.getName() === Configuration.name) {
+        configurations.push({node: cls, decorator})
+      }
+    }
+  }
+
+  return {
+    resources,
+    configurations,
+  }
+}
+
+
+export function parseProjectResources(resources: ResourceDef[]) {
+  let output: LimitlessResource[] = []
+  for (let resource of resources) {
+    let config = resource.decorator.getArguments()[0];
+    let path = '"/"'
+    if (config.getKind() === SyntaxKind.ObjectLiteralExpression) {
+      path = getProperty(config as ObjectLiteralExpression, 'path')
+    }
+    path = JSON.parse(path)
+
+    output.push({
+      path,
+      apis: {},
+      // resource,
+      node: resource.node,
+      name: resource.node.getName(),
+    })
+  }
+  return output;
+}
 
 export function getResourceClasses(sourceFile: SourceFile): LimitlessResource[] {
   let classes = sourceFile.getClasses()
@@ -201,9 +258,26 @@ function makeLimitilessFunction(
   routePath: string
 ) {
   return `
+// ROUTE PATH = ${routePath}
+export default function ${functionName}({context}) {
+  return ${originalFunctionName}(context || {})
+}`
+}
+
+function makeAsyncLimitilessFunction(
+  functionName: string,
+  originalFunctionName: string,
+  routePath: string
+) {
+  return `
 // ROUTE = ${routePath}
-export default function ${functionName}(ctx) {
-  return ${originalFunctionName}(ctx)
+import { Use, SuspenseWrapper } from "../../runtime"
+export default function ${functionName}({context}) {
+  return (
+    <SuspenseWrapper fallback="loading data">
+        <Use key="${functionName}" component={${originalFunctionName}} context={context} />
+    </SuspenseWrapper>
+  )
 }`
 }
 
@@ -231,7 +305,12 @@ function registerMethod(
   }
   moveDeclarationsToFile(method, sourceFile)
   cloneFunctionIntoFile(method, sourceFile, `original${method.getName()}`)
-  addCodeToFile(sourceFile, makeLimitilessFunction(`${className}_${methodName}`, `original${methodName}`, apiConfig.fullPath))
+  addCodeToFile(
+    sourceFile,
+    method.isAsync() ?
+      makeAsyncLimitilessFunction(`${className}_${methodName}`, `original${methodName}`, apiConfig.fullPath) :
+      makeLimitilessFunction(`${className}_${methodName}`, `original${methodName}`, apiConfig.fullPath)
+  )
 
   sourceFile.saveSync()
   let componentName = `Lazy${className}_${methodName}`;
@@ -286,4 +365,35 @@ export function scanAndProcessCapabilities(
     }
   }
   return Object.keys(output).length > 0 ? output : undefined
+}
+
+export function constructClientSideApp(appConfig: LimitlessResource[]) {
+  let importsString = `import { Application } from "../runtime";\n`
+  let routing = `let router = createBrowserRouter([`
+
+  appConfig.forEach(current => {
+    Object.values(current.apis).forEach(api => {
+      if (typeof api.path === "string" && api.moduleName && api.modulePath) {
+        importsString += `import { ${api.moduleName} } from "${api.modulePath}";\n`;
+        routing += `{ path: "${api.fullPath}", element: <${api.moduleName} /> },`
+      }
+    })
+  })
+  routing += '])'
+
+
+  return `import * as React from "react";
+import ReactDOM from "react-dom/client";
+import { createBrowserRouter, RouterProvider } from "react-router-dom"
+${importsString}
+${routing}
+
+ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+  <React.StrictMode>
+    <Application>
+      <RouterProvider router={router} />
+    </Application>
+  </React.StrictMode>
+)
+  `
 }
