@@ -1,13 +1,12 @@
 import path from 'path'
 import fs from 'fs'
 import {Plugin} from 'vite'
-import {Project} from 'ts-morph'
+import {Project, SourceFile} from 'ts-morph'
 import {
-  constructClientSideApp,
+  configureLimitlessApp, constructClientSideApp,
   getLimitlessAPIFromFile,
-  LimitlessResource,
-  parseProjectResources,
-  scanAndProcessCapabilities
+  LimitlessFile,
+  parseProjectAPI
 } from "./helpers";
 
 
@@ -15,6 +14,8 @@ import {
 export default function transformTsMorph(): Plugin {
   let config;
   let tempDir;
+  let project: Project;
+  let sources: SourceFile[];
 
   return {
     name: 'resource-plugin',
@@ -24,35 +25,63 @@ export default function transformTsMorph(): Plugin {
     async configResolved(configuration) {
       config = configuration;
       tempDir = path.join(config.root, 'src/.limitless');
-
       performWork()
     },
   };
 
-  function performWork() {
+  function prepareWorkDir() {
     fs.rmSync(tempDir, {recursive: true, force: true});
     fs.mkdirSync(tempDir, {recursive: true});
+  }
+
+  function prepareProjectAndAddFiles() {
+    project = new Project();
+    sources = project.addSourceFilesAtPaths(config.root + '/src/**/*.tsx');
 
     let filePath = path.join(tempDir, 'index.ts');
     fs.writeFileSync(filePath, 'import * as React from "react";', null);
+  }
 
-    let project = new Project();
-    let sources = project.addSourceFilesAtPaths(config.root + '/src/**/*.tsx');
-
-    let resources: LimitlessResource[] = []
+  function scanSources() {
+    let output: {sourceFile: SourceFile, limitlessAPI: LimitlessFile}[] = []
     for (let sourceFile of sources) {
-      let fileAPI = getLimitlessAPIFromFile(sourceFile);
-
-      // if (fileAPI.configurations.length) {
-      //   parseProjectConfiguration(fileAPI.configurations)
-      // }
-      if (fileAPI.resources.length) {
-        let thisFileResources = parseProjectResources(fileAPI.resources)
-        for (let fileResource of thisFileResources) {
-          fileResource.apis = scanAndProcessCapabilities(config.root, project, fileResource, tempDir)
-        }
-        resources = resources.concat(thisFileResources)
+      let fileAPI = getLimitlessAPIFromFile(sourceFile)
+      if (fileAPI.resources.length || fileAPI.configurations.length) {
+        output.push({
+          sourceFile,
+          limitlessAPI: getLimitlessAPIFromFile(sourceFile)
+        })
       }
+    }
+    return output;
+  }
+
+  function performWork() {
+    prepareWorkDir();
+    prepareProjectAndAddFiles();
+
+    let targetedFiles = scanSources()
+    let limitlessConfig = parseProjectAPI(targetedFiles)
+
+
+    let routing = configureLimitlessApp(config.root, project, limitlessConfig);
+
+    // console.log('this is config', limitlessConfig.resources.PostResource)
+
+
+
+    //
+    //
+    // let resources: LimitlessResource[] = []
+    // for (let sourceFile of sources) {
+    //   let fileAPI = getLimitlessAPIFromFile(sourceFile);
+    //   if (fileAPI.resources.length) {
+    //     let thisFileResources = parseProjectResources(fileAPI.resources)
+    //     for (let fileResource of thisFileResources) {
+    //       fileResource.apis = scanAndProcessCapabilities(config.root, project, fileResource, tempDir)
+    //     }
+    //     resources = resources.concat(thisFileResources)
+    //   }
 
       //
       // let classesConfig = getResourceClasses(sourceFile)
@@ -63,11 +92,15 @@ export default function transformTsMorph(): Plugin {
       //     appConfig.push(classConfig)
       //   }
       // }
-    }
+
+
+
+
+    // }
 
     fs.appendFileSync(
       `${tempDir}/main.tsx`,
-      constructClientSideApp(resources)
+      constructClientSideApp(routing)
     )
     // @ts-ignore
     config.build.rollupOptions.input.limitless = tempDir;

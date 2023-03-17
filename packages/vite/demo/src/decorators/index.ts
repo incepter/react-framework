@@ -7,55 +7,49 @@ export function Resource(config: ResourceConfig) {
   }
 }
 
-export function Configuration() {
-  return function (constructor: Function) {
-  }
-}
 
 export type ResourceMappingConfig = {
   path?: string,
   produces?: "text/html" | "application/json" | "blob",
 }
 
-export function Render() {
-  return function (
-    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
-  };
-}
+type RenderFunctionType<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element> = (...args: any[]) => T
 
-export function Bean() {
-  return function (
-    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+type RouteFunctionType<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element> = (RenderFunctionType<T>)
+
+export function Render() {
+  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element> (
+    target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<RenderFunctionType<T>>) {
   };
 }
 
 export function Get(config?: ResourceMappingConfig) {
-  return function (
-    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element> (
+    target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<RouteFunctionType<T>>) {
   };
 }
 
 export function Post(config?: ResourceMappingConfig) {
-  return function (
-    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element> (
+    target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<RouteFunctionType<T>>) {
   };
 }
 
 export function Patch(config?: ResourceMappingConfig) {
-  return function (
-    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element> (
+    target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<RouteFunctionType<T>>) {
   };
 }
 
 export function Delete(config?: ResourceMappingConfig) {
-  return function (
-    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element> (
+    target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<RouteFunctionType<T>>) {
   };
 }
 
 export function Put(config?: ResourceMappingConfig) {
-  return function (
-    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element> (
+    target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<RouteFunctionType<T>>) {
   };
 }
 
@@ -79,10 +73,46 @@ export let Decorators = {
   [Put.name]: {},
   [PreAuthorize.name]: {},
 }
-export let PathDecorators = {
-  [Get.name]: {},
-  [Post.name]: {},
-  [Delete.name]: {},
-  [Patch.name]: {},
-  [Put.name]: {},
+
+
+export function Configuration() {
+  return function (constructor: Function) {
+  }
+}
+
+export function Bean() {
+  return function (
+    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  };
+}
+
+export function Inject(name: string) {
+  return function (
+    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  };
+}
+
+
+
+
+
+
+
+export function Filter() {
+  return function (
+    target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<FilterType>) {
+  };
+}
+
+export type FilterContext<P, C> = {
+  getPrincipal(): P | undefined,
+  setPrincipal(principal: P): void,
+
+  context: C,
+  search?: string,
+  match?: Record<string, any>,
+}
+
+export type FilterType = {
+  (request: Request, response: Response, context: FilterContext<any, any>, next: () => void): void
 }

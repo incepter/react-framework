@@ -1,4 +1,4 @@
-import {Get, Render, Resource} from "../decorators";
+import {Get, Post, Render, Resource} from "../decorators";
 
 @Resource({path: "/"})
 export default class Home {

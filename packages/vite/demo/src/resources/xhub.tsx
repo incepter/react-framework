@@ -1,4 +1,4 @@
-import {Get, Render, Resource} from "../decorators";
+import {Filter, Get, Render, Resource} from "../decorators";
 
 @Resource({path: "/xhub"})
 export default class XhubResource {

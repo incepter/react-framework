@@ -1,13 +1,7 @@
 import * as React from "react";
 import {useAsyncState} from "react-async-states";
-import {ProducerProps} from "async-states";
+import {createSource, ProducerProps, Status} from "async-states";
 
-type AsyncComponent = (context: any) => Promise<JSX.Element>
-
-async function limitlessUseProducer(props: ProducerProps<JSX.Element, Error, never, [AsyncComponent, any]>) {
-  let [component, context] = props.args
-  return await component(context ?? {})
-}
 
 type State = {
   status: "initial" | "pending" | "error" | "success",
@@ -19,23 +13,39 @@ let initial: State = {
   data: null,
 }
 
+async function limitlessUseProducer(
+  props: ProducerProps<JSX.Element, Error, never, [AsyncComponent, any]>
+) {
+  let [component, context] = props.args
+  return await component(context ?? {})
+}
+
+type AsyncComponent = (context: any) => Promise<JSX.Element>
+
 export function use(
   key: string,
   component: AsyncComponent,
   context: any, // framework context
 ): JSX.Element | null {
-  let {state, read} = useAsyncState({
-    key,
-    lazy: false,
-    autoRunArgs: [component, context],
-    producer: limitlessUseProducer,
-  }, [component, context])
 
-  if (state.status === "initial") {
-    return null
+  let {source, state, read, lastSuccess} = useAsyncState({
+    key,
+    producer: limitlessUseProducer
+  }, [key])
+
+  let latestRunArgs = state.props?.args || []
+  if (latestRunArgs[0] !== component || latestRunArgs[1] !== context) {
+    source!.runp(component, context)
   }
 
-  return read().data as JSX.Element
+  read() // throws in pending and error
+  if (
+    lastSuccess &&
+    lastSuccess.status === Status.success &&
+    React.isValidElement(lastSuccess.data)) {
+    return lastSuccess.data
+  }
+  throw new Error("Should not be here");
 }
 
 export function SuspenseWrapper({children, fallback}) {
@@ -47,15 +57,15 @@ export function SuspenseWrapper({children, fallback}) {
 }
 
 export function Use({
-  key,
+  componentKey,
   component,
   context, // framework context
 }: {
-  key: string,
+  componentKey: string,
   component: AsyncComponent,
   context: any
 }) {
-  return use(key, component, context)
+  return use(componentKey, component, context)
 }
 
 type AppRoutes = {}
