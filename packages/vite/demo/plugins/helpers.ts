@@ -4,7 +4,6 @@ import {
   Configuration,
   Decorators,
   Delete,
-  FilterType,
   Get,
   Patch,
   Post,
@@ -24,14 +23,6 @@ import {
   SyntaxKind,
 } from "ts-morph";
 import {addCodeToFile} from "./file-utils";
-import {Children} from "react";
-
-export interface LimitlessResource {
-  path: string,
-  name: string,
-  node: ClassDeclaration,
-  apis: Record<string, ApiConfiguration>
-}
 
 export function getProperty(
   obj: ObjectLiteralExpression, prop: string): string | undefined {
@@ -53,11 +44,6 @@ export type LimitlessFile = {
   configurations: ResourceDef[],
 }
 
-let LimitlessClassAPIDecorators = {
-  [Resource.name]: true,
-  [Configuration.name]: true,
-}
-
 type LimitlessRouteConfig = {
   path: string,
   method: string,
@@ -69,11 +55,6 @@ type LimitlessRouteConfig = {
   capabilities: {},
 
   children?: Record<string, LimitlessRouteConfig>
-}
-
-export type LimitlessConfig = {
-  filters: FilterType[],
-  routes: Record<string, LimitlessRouteConfig>,
 }
 
 function getPathFromDecorator(
@@ -132,6 +113,8 @@ function scanMethodsForApi(
           methodAPIs[methodName].shortPath = result.path;
           methodAPIs[methodName].routePath = `${basePath}${result.path}`;
           methodAPIs[methodName].decorators[result.decoratorName] = true;
+        } else {
+          methodAPIs[methodName].decorators[result.decoratorName] = true;
         }
       }
       if (result) {
@@ -146,8 +129,7 @@ function resolveApiFromResource(resource: ResourceDef) {
   let cls = resource.node;
   let resourcePath = getPathFromDecorator(resource.decorator)
 
-  let apis = scanMethodsForApi(cls.getMethods(), resourcePath)
-  return apis;
+  return scanMethodsForApi(cls.getMethods(), resourcePath);
 }
 
 type LimitlessApi = {
@@ -159,7 +141,8 @@ type LimitlessApi = {
   children?: Record<string, LimitlessApi>
 }
 
-function performExtractionOnApi(rootDir: string, project: Project, methodApi: MethodApi, api: LimitlessApi) {
+function performExtractionOnApi(
+  rootDir: string, project: Project, methodApi: MethodApi, api: LimitlessApi) {
   registerMethod(
     rootDir,
     project,
@@ -170,7 +153,10 @@ function performExtractionOnApi(rootDir: string, project: Project, methodApi: Me
   );
 }
 
-export function configureLimitlessApp(rootDir: string, project: Project, config: { resources: Record<string, MethodApis>, filters: [] }) {
+export function configureLimitlessApp(
+  rootDir: string, project: Project,
+  config: { resources: Record<string, MethodApis>, filters: [] }
+) {
   let flatRouting: Record<string, LimitlessApi> = {}
 
   for (let [resourceName, resourceApis] of Object.entries(config.resources)) {
@@ -190,6 +176,7 @@ export function configureLimitlessApp(rootDir: string, project: Project, config:
           current[routeName].element = `<Lazy_${moduleName} />`;
           current[routeName].moduleName = moduleName;
           current[routeName].modulePath = "./index";
+
 
           performExtractionOnApi(rootDir, project, api, current[routeName])
 
@@ -218,11 +205,6 @@ export function configureLimitlessApp(rootDir: string, project: Project, config:
     }
   }
 
-  // console.log(flatRouting)
-  // console.log(flatRouting['Get_/'].children)
-  // console.log(Object.keys(flatRouting), Object.values(flatRouting))
-  // console.log(JSON.stringify(flatRouting, null, 2))
-
   return flatRouting
 }
 
@@ -248,47 +230,6 @@ export function parseProjectAPI(targetedFiles: { sourceFile: SourceFile, limitle
   return output
 }
 
-export function scanAndProcessCapabilities(
-  rootDir: string,
-  project: Project,
-  classConfig: LimitlessResource,
-  outDir: string,
-): Record<string, ApiConfiguration> | undefined {
-
-  let output: Record<string, ApiConfiguration> = {}
-  let classNode = classConfig.node
-
-
-  for (let method of classNode.getMethods()) {
-    let hasFrameworkDecorators = false
-
-    let apiConfig: ApiConfiguration = {
-      decorators: {},
-      name: method.getName(),
-    }
-
-    for (let decorator of method.getDecorators()) {
-      if (parseDecorator(decorator, classConfig, apiConfig)) {
-        hasFrameworkDecorators = true
-      }
-    }
-
-    if (hasFrameworkDecorators) {
-      registerMethod(
-        rootDir,
-        project,
-        classNode.getName(),
-        method,
-        outDir,
-        apiConfig,
-      )
-      output[method.getName()] = apiConfig
-    }
-  }
-  return Object.keys(output).length > 0 ? output : undefined
-}
-
-
 export function getLimitlessAPIFromFile(sourceFile: SourceFile): LimitlessFile {
   let classes = sourceFile.getClasses()
   let resources: ResourceDef[] = []
@@ -310,80 +251,6 @@ export function getLimitlessAPIFromFile(sourceFile: SourceFile): LimitlessFile {
     resources,
     configurations,
   }
-}
-
-
-export function parseProjectResources(resources: ResourceDef[]) {
-  let output: LimitlessResource[] = []
-  for (let resource of resources) {
-    let config = resource.decorator.getArguments()[0];
-    let path = '"/"'
-    if (config.getKind() === SyntaxKind.ObjectLiteralExpression) {
-      path = getProperty(config as ObjectLiteralExpression, 'path')
-    }
-    path = JSON.parse(path)
-
-    output.push({
-      path,
-      apis: {},
-      // resource,
-      node: resource.node,
-      name: resource.node.getName(),
-    })
-  }
-  return output;
-}
-
-export function getResourceClasses(sourceFile: SourceFile): LimitlessResource[] {
-  let classes = sourceFile.getClasses()
-  let output: LimitlessResource[] = []
-
-  for (let cls of classes) {
-    let resourceDecorator = cls.getDecorator('Resource');
-    if (resourceDecorator) {
-      let args = resourceDecorator.getArguments();
-      let configArg = args[0];
-
-      if (configArg.getKind() === SyntaxKind.ObjectLiteralExpression) {
-        let path = getProperty(configArg as ObjectLiteralExpression, 'path')
-        if (path) {
-          output.push({
-            apis: {},
-            node: cls,
-            name: cls.getName(),
-            path: JSON.parse(path)
-          })
-        }
-      }
-      resourceDecorator.remove()
-    }
-  }
-  return output;
-}
-
-
-export type ApiConfiguration = {
-  name: string,
-  path?: string,
-  fullPath?: string,
-  moduleName?: string,
-  modulePath?: string,
-
-  decorators: {
-    Get?: { path?: string }
-    Put?: { path?: string }
-    Post?: { path?: string }
-    Patch?: { path?: string }
-    Delete?: { path?: string }
-    Render?: { config?: string }
-  }
-}
-
-export interface DecoratorConfigured {
-  name: string,
-  path?: string,
-  fullPath?: string,
-  modulePath?: string,
 }
 
 type ParsedDecorator = {
@@ -459,7 +326,6 @@ function cloneFunctionIntoFile(
   sourceFile: SourceFile,
   functionName: string
 ) {
-
   return sourceFile.addFunction({
     name: functionName,
     isAsync: method.isAsync(),
@@ -477,10 +343,15 @@ function makeLimitilessFunction(
   originalFunctionName: string,
   routePath: string
 ) {
-  return `
-// ROUTE PATH = ${routePath}
-export default function ${functionName}({context}) {
-  return ${originalFunctionName}(context || {})
+  return `import { UseComponent, SuspenseWrapper } from "../../runtime"
+
+// ROUTE = ${routePath}
+export default function ${functionName}() {
+  return (
+    <SuspenseWrapper fallback="loading">
+        <UseComponent component={${originalFunctionName}} />
+    </SuspenseWrapper>
+  )
 }`
 }
 
@@ -489,13 +360,13 @@ function makeAsyncLimitilessFunction(
   originalFunctionName: string,
   routePath: string
 ) {
-  return `
+  return `import { UseAsyncComponent, SuspenseWrapper } from "../../runtime"
+
 // ROUTE = ${routePath}
-import { Use, SuspenseWrapper } from "../../runtime"
-export default function ${functionName}({context}) {
+export default function ${functionName}() {
   return (
     <SuspenseWrapper fallback="loading data">
-        <Use componentKey="${functionName}" component={${originalFunctionName}} context={context} />
+        <UseAsyncComponent componentKey="${functionName}" component={${originalFunctionName}} />
     </SuspenseWrapper>
   )
 }`
@@ -516,21 +387,20 @@ function registerMethod(
 
   let hasRender = !!apiConfig.decorators.Render
 
-  let extension = hasRender ? "tsx" : "tsx"
+  let extension = hasRender ? "tsx" : "ts"
   let filePath = path.join(dirName, `${className}_${method.getName()}.${extension}`);
   let sourceFile = project.createSourceFile(filePath, undefined, {overwrite: true})
 
-  // if (hasRender) {
+  if (hasRender) {
     addCodeToFile(sourceFile, `import * as React from "react"`)
-  // }
-  console.log('___________________', sourceFile.getFilePath(), apiConfig.decorators)
+  }
   moveDeclarationsToFile(method, sourceFile)
   cloneFunctionIntoFile(method, sourceFile, `original${method.getName()}`)
   addCodeToFile(
     sourceFile,
     method.isAsync() ?
-      makeAsyncLimitilessFunction(`${className}_${methodName}`, `original${methodName}`, apiConfig.fullPath) :
-      makeLimitilessFunction(`${className}_${methodName}`, `original${methodName}`, apiConfig.fullPath)
+      makeAsyncLimitilessFunction(`${className}_${methodName}`, `original${methodName}`, apiConfig.routePath) :
+      makeLimitilessFunction(`${className}_${methodName}`, `original${methodName}`, apiConfig.routePath)
   )
 
   sourceFile.saveSync()
@@ -546,20 +416,39 @@ function registerMethod(
   );
 }
 
-function getString(api: LimitlessApi): string {
-  let str = ''
-  console.log('in', api)
-  if (api.path) {
-      str += `{path: '${api.path}', element: ${api.element},`;
-    if (api.children) {
-      str += `children: [${Object.values(api.children).map(getString).join(",")}]`
+function getRoutingAsString(api: LimitlessApi, isTopLevel = false): string {
+
+  if (isTopLevel) {
+    return Object.values(api.children)
+      .map(val => getRoutingAsString(val))
+      .filter(t => typeof t === "string" && t.trim() !== "")
+      .join(",")
+  } else {
+    let didAddElement = false;
+    let result = ''
+    if (typeof api.path === "string") {
+      didAddElement = true
+      result += `{ ${api.path === "" ? "index: true," : `path: "${api.path}",`} element: ${api.element}`
     }
-      str += '},'
-  } else if (api.children) {
-    str += `${Object.values(api.children).map(getString).join("")},`
+    if (api.children) {
+      let content = Object.values(api.children)
+        .map(val => getRoutingAsString(val))
+        .filter(t => typeof t === "string" && t.trim() !== "")
+        .join(",");
+      if (result !== "") {
+        result += `, children: [${content}]`
+      } else {
+        result += `[${content}]`
+      }
+    }
+    if (didAddElement) {
+      result += "}"
+    }
+
+    return result
   }
-  return str;
 }
+
 function getImports(api: LimitlessApi): {} {
   let imports = '';
   if (api.moduleName) {
@@ -568,30 +457,23 @@ function getImports(api: LimitlessApi): {} {
   return !api.children ? imports : `${imports}${Object.values(api.children).map(getImports).join("")}`
 }
 
-export function constructClientSideApp(appConfig: Record<string, LimitlessApi>) {
-  let importsString = `import { Application } from "../runtime";\n`
-  let routing = `let router = createBrowserRouter([`
+let staticImports = `import * as React from "react";\nimport { Application, RunCSRApp } from "../runtime";\n\n`
 
+export function constructClientSideApp(appConfig: Record<string, LimitlessApi>) {
+  let routing = `let routing = [`
+
+  let importsString = '';
   let gets: LimitlessApi = appConfig[`${Get.name}_/`];
   if (gets) {
     importsString += getImports(gets)
-    routing += getString(gets)
+    routing += getRoutingAsString(gets, true)
   }
-  routing += '])'
+  routing += ']'
 
-
-  return `import * as React from "react";
-import ReactDOM from "react-dom/client";
-import { createBrowserRouter, RouterProvider } from "react-router-dom"
-${importsString}
+  return `
+${staticImports}${importsString}
 ${routing}
 
-ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <React.StrictMode>
-    <Application>
-      <RouterProvider router={router} />
-    </Application>
-  </React.StrictMode>
-)
-  `
+RunCSRApp(routing);
+`
 }

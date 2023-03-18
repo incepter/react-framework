@@ -62,41 +62,7 @@ export default function transformTsMorph(): Plugin {
 
     let targetedFiles = scanSources()
     let limitlessConfig = parseProjectAPI(targetedFiles)
-
-
     let routing = configureLimitlessApp(config.root, project, limitlessConfig);
-
-    // console.log('this is config', limitlessConfig.resources.PostResource)
-
-
-
-    //
-    //
-    // let resources: LimitlessResource[] = []
-    // for (let sourceFile of sources) {
-    //   let fileAPI = getLimitlessAPIFromFile(sourceFile);
-    //   if (fileAPI.resources.length) {
-    //     let thisFileResources = parseProjectResources(fileAPI.resources)
-    //     for (let fileResource of thisFileResources) {
-    //       fileResource.apis = scanAndProcessCapabilities(config.root, project, fileResource, tempDir)
-    //     }
-    //     resources = resources.concat(thisFileResources)
-    //   }
-
-      //
-      // let classesConfig = getResourceClasses(sourceFile)
-      // if (classesConfig.length > 0) {
-      //
-      //   for (let classConfig of classesConfig) {
-      //     classConfig.apis = scanAndProcessCapabilities(config.root, project, classConfig, tempDir)
-      //     appConfig.push(classConfig)
-      //   }
-      // }
-
-
-
-
-    // }
 
     fs.appendFileSync(
       `${tempDir}/main.tsx`,

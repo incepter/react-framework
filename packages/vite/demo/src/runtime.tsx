@@ -1,6 +1,14 @@
 import * as React from "react";
+import ReactDOM from "react-dom/client";
 import {useAsyncState} from "react-async-states";
-import {createSource, ProducerProps, Status} from "async-states";
+
+import {
+  createBrowserRouter,
+  RouterProvider,
+  useLocation, useParams
+} from "react-router-dom"
+
+import {ProducerProps, Status} from "async-states";
 
 
 type State = {
@@ -27,15 +35,14 @@ export function use(
   component: AsyncComponent,
   context: any, // framework context
 ): JSX.Element | null {
-
   let {source, state, read, lastSuccess} = useAsyncState({
     key,
-    producer: limitlessUseProducer
+    resetStateOnDispose: true,
+    producer: limitlessUseProducer,
   }, [key])
 
-  let latestRunArgs = state.props?.args || []
-  if (latestRunArgs[0] !== component || latestRunArgs[1] !== context) {
-    source!.runp(component, context)
+  if (state.status === Status.initial) {
+    throw source!.runp(component, context)
   }
 
   read() // throws in pending and error
@@ -56,16 +63,36 @@ export function SuspenseWrapper({children, fallback}) {
   )
 }
 
-export function Use({
+export function UseAsyncComponent({
   componentKey,
   component,
-  context, // framework context
 }: {
   componentKey: string,
   component: AsyncComponent,
-  context: any
 }) {
+  let params = useParams()
+  let location = useLocation()
+  let context = React.useMemo(() => ({
+    params,
+    search: location.search,
+    pathname: location.pathname,
+  }), [params, location.search, location.pathname])
   return use(componentKey, component, context)
+}
+
+export function UseComponent({
+  component,
+}: {
+  component: AsyncComponent,
+}) {
+  let params = useParams()
+  let location = useLocation()
+  let context = React.useMemo(() => ({
+    params,
+    search: location.search,
+    pathname: location.pathname,
+  }), [params, location])
+  return component(context)
 }
 
 type AppRoutes = {}
@@ -115,5 +142,19 @@ export function Application({children}) {
     <React.Suspense fallback="Loading...">
       {children}
     </React.Suspense>
+  )
+}
+
+
+
+export function RunCSRApp(routing) {
+  let router = createBrowserRouter(routing)
+
+  ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
+    <React.StrictMode>
+      <Application>
+        <RouterProvider router={router}/>
+      </Application>
+    </React.StrictMode>
   )
 }

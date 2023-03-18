@@ -1,5 +1,7 @@
 import {Get, Post, PreAuthorize, Render, Resource} from "../decorators";
 import * as React from "react";
+import {Outlet} from "react-router-dom";
+import Layout from "../components/Layout";
 
 
 @Resource({path: "/posts"})
@@ -7,7 +9,7 @@ export class PostResource {
 
   @Render()
   @Get({path: "/:id"})
-  async PostDetails({match: {id}}) {
+  async PostDetails({params: {id}}) {
     let postDetails = await fetch(`https://jsonplaceholder.typicode.com/posts/${id}`)
       .then(res => res.json())
     return (
@@ -23,7 +25,7 @@ export class PostResource {
   @Get()
   @Render()
   GetPosts({query}) {
-    return <div>Hello! /posts root!</div>
+    return <div><Layout />Hello! /posts root! <hr/><Outlet /></div>
   }
 
   @Render()
