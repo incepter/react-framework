@@ -3,11 +3,12 @@ import fs from 'fs'
 import {Plugin} from 'vite'
 import {Project, SourceFile} from 'ts-morph'
 import {
-  configureLimitlessApp, constructClientSideApp,
+  configureLimitlessApp,
   getLimitlessAPIFromFile,
   LimitlessFile,
   parseProjectAPI
 } from "./helpers";
+import {constructServerSideApp} from "./server";
 
 
 /** @type {import('vite').UserConfig} */
@@ -64,12 +65,54 @@ export default function transformTsMorph(): Plugin {
     let limitlessConfig = parseProjectAPI(targetedFiles)
     let routing = configureLimitlessApp(config.root, project, limitlessConfig);
 
+    // fs.appendFileSync(
+    //   `${tempDir}/main.tsx`,
+    //   constructClientSideApp(routing)
+    // )
+
     fs.appendFileSync(
       `${tempDir}/main.tsx`,
-      constructClientSideApp(routing)
+      constructServerSideApp(routing)
+    )
+    fs.appendFileSync(
+      `${tempDir}/server.js`,
+      `import express from "express";
+import ReactDOMServer from 'react-dom/server';
+
+import {App} from "../../dist/assets/index.js"
+
+const app = express();
+const port = process.env.PORT ?? 3000;
+
+app.get('*', async (request, response) => {
+  
+  let didError = false;
+  
+  const stream = ReactDOMServer.renderToPipeableStream(
+    App(request),
+    {
+      onShellReady: () => {
+        response.statusCode = didError ? 500 : 200;
+        response.setHeader('Content-type', 'text/html');
+        stream.pipe(response);
+      },
+      onError: (error) => {
+        didError = true;
+        console.log(error);
+        response.status(500).send('Internal Server Error');
+      }
+    }
+  );
+})
+
+app.listen(port, () => {
+console.log(\`Started listening at http://localhost:\${port}\`)
+})
+      
+`
     )
     // @ts-ignore
-    config.build.rollupOptions.input.limitless = tempDir;
+    // config.build.rollupOptions.input.limitless = tempDir;
   }
 
 }

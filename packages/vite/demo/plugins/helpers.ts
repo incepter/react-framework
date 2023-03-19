@@ -132,7 +132,7 @@ function resolveApiFromResource(resource: ResourceDef) {
   return scanMethodsForApi(cls.getMethods(), resourcePath);
 }
 
-type LimitlessApi = {
+export type LimitlessApi = {
   path: string,
   element: string,
   moduleName: string,
@@ -416,7 +416,7 @@ function registerMethod(
   );
 }
 
-function getRoutingAsString(api: LimitlessApi, isTopLevel = false): string {
+export function getRoutingAsString(api: LimitlessApi, isTopLevel = false): string {
 
   if (isTopLevel) {
     return Object.values(api.children)
@@ -438,7 +438,9 @@ function getRoutingAsString(api: LimitlessApi, isTopLevel = false): string {
       if (result !== "") {
         result += `, children: [${content}]`
       } else {
-        result += `[${content}]`
+        if (content && content !== "") {
+          result += `[${content}]`
+        }
       }
     }
     if (didAddElement) {
@@ -449,7 +451,7 @@ function getRoutingAsString(api: LimitlessApi, isTopLevel = false): string {
   }
 }
 
-function getImports(api: LimitlessApi): {} {
+export function getImports(api: LimitlessApi): {} {
   let imports = '';
   if (api.moduleName) {
     imports = `import { Lazy_${api.moduleName} } from "${api.modulePath}";\n`;
