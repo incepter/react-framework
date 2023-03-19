@@ -4,19 +4,23 @@ import transformTsMorph from "./plugins/transform-ts-morph";
 
 export default defineConfig({
   build: {
+    ssr: true,
     minify: false,
     rollupOptions: {
-      external: ['react', 'react-dom'],
+      // external: ['react', 'react-dom', 'react-dom/server', 'express'],
       input: {
-        index: "src/.limitless/main.tsx",
+        // index: "src/.limitless/client.tsx",
         // index: "index.html",
       },
       output: {
-        globals: {
-          react: 'React',
-          'react-dom': 'ReactDOM',
-        },
-        format: "esm"
+        // inlineDynamicImports: false,
+        // globals: {
+        //   react: 'React',
+        //   express: 'express',
+        //   'react-dom': 'ReactDOM',
+        //   'react-dom/server': 'ReactDOMServer',
+        // },
+        // format: "esm"
       }
     }
   },

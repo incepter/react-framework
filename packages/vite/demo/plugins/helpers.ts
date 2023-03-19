@@ -89,6 +89,7 @@ function scanMethodsForApi(
   methods: MethodDeclaration[], basePath: string): MethodApis {
   let methodAPIs: MethodApis = {}
   let hasFrameworkAPIs = false;
+  console.log(`processing methods of file ${methods[0]?.getSourceFile().getFilePath()}`)
   for (let method of methods) {
     for (let decorator of method.getDecorators()) {
       let result = parseDecorator(decorator);
@@ -112,6 +113,7 @@ function scanMethodsForApi(
           methodAPIs[methodName].method = routeMethod;
           methodAPIs[methodName].shortPath = result.path;
           methodAPIs[methodName].routePath = `${basePath}${result.path}`;
+          console.log(`[[API] Found API route of type ${routeMethod} and path ${methodAPIs[methodName].routePath}]`)
           methodAPIs[methodName].decorators[result.decoratorName] = true;
         } else {
           methodAPIs[methodName].decorators[result.decoratorName] = true;
@@ -219,7 +221,8 @@ export function parseProjectAPI(targetedFiles: { sourceFile: SourceFile, limitle
       for (let resource of resources) {
         let result = resolveApiFromResource(resource);
         if (result) {
-          output.resources[resource.node.getName()] = result
+          let resourceName = resource.node.getName();
+          output.resources[resourceName] = result
         }
       }
     }
@@ -381,6 +384,7 @@ function registerMethod(
   outDir: string,
   apiConfig: MethodApi,
 ) {
+  console.log(`registering ${className}_${method.getName()} in file ${method.getSourceFile().getFilePath()}`)
   let methodName = method.getName();
   let dirName = `${outDir}/${className}`;
   fs.mkdirSync(dirName, {recursive: true});
@@ -416,7 +420,8 @@ function registerMethod(
   );
 }
 
-export function getRoutingAsString(api: LimitlessApi, isTopLevel = false): string {
+export function getRoutingAsString(
+  api: LimitlessApi, isTopLevel = false): string {
 
   if (isTopLevel) {
     return Object.values(api.children)
@@ -439,7 +444,7 @@ export function getRoutingAsString(api: LimitlessApi, isTopLevel = false): strin
         result += `, children: [${content}]`
       } else {
         if (content && content !== "") {
-          result += `[${content}]`
+          result += `${content}`
         }
       }
     }

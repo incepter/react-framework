@@ -1,3 +1,4 @@
+import esbuild from 'esbuild'
 import path from 'path'
 import fs from 'fs'
 import {Plugin} from 'vite'
@@ -8,13 +9,14 @@ import {
   LimitlessFile,
   parseProjectAPI
 } from "./helpers";
-import {constructServerSideApp} from "./server";
+import {constructServerClientApp, constructServerSideApp} from "./server";
 
 
 /** @type {import('vite').UserConfig} */
 export default function transformTsMorph(): Plugin {
   let config;
   let tempDir;
+  let buildMode;
   let project: Project;
   let sources: SourceFile[];
 
@@ -23,12 +25,64 @@ export default function transformTsMorph(): Plugin {
     // handleHotUpdate({file}) {
     //   performWork()
     // },
+    generateBundle() {
+      if (buildMode === "ssr") {
+        console.log('__________________')
+        esbuild
+          .build({
+            jsx: "transform",
+            entryPoints: [tempDir + "/client.tsx"],
+            bundle: true,
+            platform: 'browser',
+            target: 'es2017',
+            splitting: true,
+            format: "esm",
+            outdir: 'dist/client',
+            // outfile: 'build/client.js',
+            loader: {
+              '.js': 'jsx',
+              '.ts': 'tsx',
+              '.tsx': 'tsx',
+            },
+          })
+          .then(() => console.log('_____________esbuild end___________'))
+          .catch(() => process.exit(1));
+      }
+    },
     async configResolved(configuration) {
       config = configuration;
       tempDir = path.join(config.root, 'src/.limitless');
-      performWork()
+      await performWork()
     },
   };
+
+  async function performWork() {
+    prepareWorkDir();
+    prepareProjectAndAddFiles();
+
+    buildMode = resolveBuildMode();
+
+    let targetedFiles = scanSources();
+    let limitlessConfig = parseProjectAPI(targetedFiles)
+    let routing = configureLimitlessApp(config.root, project, limitlessConfig);
+
+
+    if (buildMode === "csr") {
+      fs.appendFileSync(`${tempDir}/main.tsx`, constructServerSideApp(routing))
+      config.build.rollupOptions.input.limitless = tempDir;
+    }
+
+    if (buildMode === "ssr") {
+      let src = config.root + "/plugins/static/server.js";
+      fs.copyFileSync(src, tempDir + "/server.js");
+      fs.appendFileSync(`${tempDir}/main.tsx`, constructServerSideApp(routing))
+      fs.appendFileSync(`${tempDir}/client.tsx`, constructServerClientApp(routing))
+      config.build.rollupOptions.input.server = tempDir + "/server.js";
+      // config.build.rollupOptions.input.client = tempDir + "/client.tsx";
+    }
+    // @ts-ignore
+    // config.build.rollupOptions.input.limitless = tempDir;
+  }
 
   function prepareWorkDir() {
     fs.rmSync(tempDir, {recursive: true, force: true});
@@ -48,6 +102,7 @@ export default function transformTsMorph(): Plugin {
     for (let sourceFile of sources) {
       let fileAPI = getLimitlessAPIFromFile(sourceFile)
       if (fileAPI.resources.length || fileAPI.configurations.length) {
+        console.log(`[[Resource] - Found resource in file ${sourceFile.getFilePath()}]`)
         output.push({
           sourceFile,
           limitlessAPI: getLimitlessAPIFromFile(sourceFile)
@@ -57,62 +112,16 @@ export default function transformTsMorph(): Plugin {
     return output;
   }
 
-  function performWork() {
-    prepareWorkDir();
-    prepareProjectAndAddFiles();
-
-    let targetedFiles = scanSources()
-    let limitlessConfig = parseProjectAPI(targetedFiles)
-    let routing = configureLimitlessApp(config.root, project, limitlessConfig);
-
-    // fs.appendFileSync(
-    //   `${tempDir}/main.tsx`,
-    //   constructClientSideApp(routing)
-    // )
-
-    fs.appendFileSync(
-      `${tempDir}/main.tsx`,
-      constructServerSideApp(routing)
-    )
-    fs.appendFileSync(
-      `${tempDir}/server.js`,
-      `import express from "express";
-import ReactDOMServer from 'react-dom/server';
-
-import {App} from "../../dist/assets/index.js"
-
-const app = express();
-const port = process.env.PORT ?? 3000;
-
-app.get('*', async (request, response) => {
-  
-  let didError = false;
-  
-  const stream = ReactDOMServer.renderToPipeableStream(
-    App(request),
-    {
-      onShellReady: () => {
-        response.statusCode = didError ? 500 : 200;
-        response.setHeader('Content-type', 'text/html');
-        stream.pipe(response);
-      },
-      onError: (error) => {
-        didError = true;
-        console.log(error);
-        response.status(500).send('Internal Server Error');
+  function resolveBuildMode(): "csr" | "ssr" | "rsc" {
+    let filePath = config.root + "/.limitless.json";
+    try {
+      if (fs.existsSync(filePath)) {
+        return JSON.parse(fs.readFileSync(filePath, "utf-8")).target;
       }
+      return "csr"
+    } catch (e) {
+      return "csr"
     }
-  );
-})
-
-app.listen(port, () => {
-console.log(\`Started listening at http://localhost:\${port}\`)
-})
-      
-`
-    )
-    // @ts-ignore
-    // config.build.rollupOptions.input.limitless = tempDir;
   }
 
 }

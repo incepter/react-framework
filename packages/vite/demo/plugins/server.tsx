@@ -18,10 +18,28 @@ export function constructServerSideApp(appConfig: Record<string, LimitlessApi>) 
 ${staticImports}${importsString}
 ${routing}
 
-export default function interceptRequest(request) {
-  return RunSSRApp(routing, request);
+export default RunSSRApp(routing);
+`
 }
 
-console.log('interceptRequest', interceptRequest)
+export function constructServerClientApp(appConfig: Record<string, LimitlessApi>) {
+  let routing = `let routing = [`
+
+  let importsString = '';
+  let gets: LimitlessApi = appConfig[`${Get.name}_/`];
+  if (gets) {
+    importsString += getImports(gets)
+    routing += getRoutingAsString(gets, true)
+  }
+  routing += ']'
+
+  return `import React from 'react';
+import {renderClientApp} from '../runtime.server';\n
+import {hydrateRoot} from 'react-dom/client';
+${importsString}
+
+${routing}
+
+hydrateRoot(document.getElementById('root'), renderClientApp(routing));
 `
 }

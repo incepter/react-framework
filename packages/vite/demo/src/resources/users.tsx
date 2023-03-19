@@ -18,7 +18,7 @@ export class UserResource {
   }
   @Render()
   @Get({path: "/:id/posts"})
-  UserPosts({body}) {
+  async UserPosts({body}) {
     return <UserPostsDetails />
   }
 }
