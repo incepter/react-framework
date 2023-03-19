@@ -4,7 +4,7 @@ import fs from 'fs'
 import {Plugin} from 'vite'
 import {Project, SourceFile} from 'ts-morph'
 import {
-  configureLimitlessApp,
+  configureLimitlessApp, constructClientSideApp,
   getLimitlessAPIFromFile,
   LimitlessFile,
   parseProjectAPI
@@ -68,8 +68,8 @@ export default function transformTsMorph(): Plugin {
 
 
     if (buildMode === "csr") {
-      fs.appendFileSync(`${tempDir}/main.tsx`, constructServerSideApp(routing))
-      config.build.rollupOptions.input.limitless = tempDir;
+      fs.appendFileSync(`${tempDir}/main.tsx`, constructClientSideApp(routing))
+      // config.build.rollupOptions.input.limitless = tempDir;
     }
 
     if (buildMode === "ssr") {

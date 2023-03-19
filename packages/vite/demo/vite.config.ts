@@ -4,7 +4,7 @@ import transformTsMorph from "./plugins/transform-ts-morph";
 
 export default defineConfig({
   build: {
-    ssr: true,
+    // ssr: true,
     minify: false,
     rollupOptions: {
       // external: ['react', 'react-dom', 'react-dom/server', 'express'],
