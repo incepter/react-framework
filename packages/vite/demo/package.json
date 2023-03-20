@@ -6,11 +6,14 @@
   "scripts": {
     "dev": "vite",
     "devssr": "vite",
+    "build:csr": "tsc && vite build --config vite.config.csr.ts",
+    "build:ssr": "tsc && vite build --config vite.config.ssr.client.ts",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "async-states": "^1.1.1",
+    "axios": "^1.3.4",
     "express": "^4.18.2",
     "lodash": "^4.17.21",
     "react": "^18.2.0",

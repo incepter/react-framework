@@ -18,7 +18,8 @@ export function constructServerSideApp(appConfig: Record<string, LimitlessApi>) 
 ${staticImports}${importsString}
 ${routing}
 
-export default RunSSRApp(routing);
+let element = RunSSRApp(routing);
+export default element;
 `
 }
 

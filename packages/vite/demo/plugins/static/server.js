@@ -1,16 +1,16 @@
 import express from "express";
 import ReactDOMServer from 'react-dom/server';
-import App from "./main"
+import App from "./main";
 
 const app = express();
 const port = process.env.PORT ?? 3000;
-app.use(express.static('.'))
+app.use("/assets", express.static("."));
 app.get('*', async (request, response) => {
   let didError = false;
   const stream = ReactDOMServer.renderToPipeableStream(
     App(request),
     {
-      bootstrapModules: ["/client/client.js"],
+      bootstrapModules: ["/assets/client/client.js"],
       // bootstrapScripts: ["/client.mjs"],
       onShellReady: () => {
         response.statusCode = didError ? 500 : 200;

@@ -27,18 +27,17 @@ export default function transformTsMorph(): Plugin {
     // },
     generateBundle() {
       if (buildMode === "ssr") {
-        console.log('__________________')
+        let entryPoints = [tempDir + "/client.tsx"]
         esbuild
           .build({
-            jsx: "transform",
-            entryPoints: [tempDir + "/client.tsx"],
+            entryPoints,
             bundle: true,
-            platform: 'browser',
-            target: 'es2017',
-            splitting: true,
             format: "esm",
             outdir: 'dist/client',
-            // outfile: 'build/client.js',
+            splitting: true,
+            target: 'es2017',
+            jsx: "transform",
+            platform: 'browser',
             loader: {
               '.js': 'jsx',
               '.ts': 'tsx',
@@ -48,6 +47,7 @@ export default function transformTsMorph(): Plugin {
           .then(() => console.log('_____________esbuild end___________'))
           .catch(() => process.exit(1));
       }
+
     },
     async configResolved(configuration) {
       config = configuration;
@@ -68,17 +68,18 @@ export default function transformTsMorph(): Plugin {
 
 
     if (buildMode === "csr") {
-      fs.appendFileSync(`${tempDir}/main.tsx`, constructClientSideApp(routing))
-      // config.build.rollupOptions.input.limitless = tempDir;
+      fs.appendFileSync(`${tempDir}/client.tsx`, constructClientSideApp(routing))
+      // config.build.rollupOptions.input.client = tempDir + "/client.tsx";
     }
 
     if (buildMode === "ssr") {
-      let src = config.root + "/plugins/static/server.js";
-      fs.copyFileSync(src, tempDir + "/server.js");
       fs.appendFileSync(`${tempDir}/main.tsx`, constructServerSideApp(routing))
       fs.appendFileSync(`${tempDir}/client.tsx`, constructServerClientApp(routing))
-      config.build.rollupOptions.input.server = tempDir + "/server.js";
-      // config.build.rollupOptions.input.client = tempDir + "/client.tsx";
+
+      let serverJs = config.root + "/plugins/static/server.js";
+      fs.copyFileSync(serverJs, tempDir + "/server.js");
+      // config.build.rollupOptions.input.server = tempDir + "/server.js";
+      // config.build.rollupOptions.input.client = config.root + "/index.html";
     }
     // @ts-ignore
     // config.build.rollupOptions.input.limitless = tempDir;

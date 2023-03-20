@@ -30,28 +30,69 @@ async function limitlessUseProducer(
 
 type AsyncComponent = (context: any) => Promise<JSX.Element>
 
+function infinitePromise() {
+  return new Promise(resolve => {
+  })
+}
+
 export function use(
   key: string,
   component: AsyncComponent,
   context: any, // framework context
 ): JSX.Element | null {
+  console.log('rendering', {component, context})
   let {source, state, read, lastSuccess} = useAsyncState({
     key,
     resetStateOnDispose: true,
     producer: limitlessUseProducer,
   }, [key])
 
-  if (state.status === Status.initial) {
+  console.log('will check', state.status, lastSuccess?.status, lastSuccess?.props?.args)
+  if (
+    state.status === Status.initial ||
+    (
+      state.status !== Status.pending &&
+      (
+        lastSuccess?.props?.args?.[1]?.params !== context.params ||
+        lastSuccess?.props?.args?.[1]?.pathname !== context.pathname ||
+        lastSuccess?.props?.args?.[0] !== component
+      )
+    )
+  ) {
+    if (
+      lastSuccess?.props?.args?.[1] !== context
+    ){
+      console.log('______________context change', lastSuccess?.props?.args?.[1], context)
+
+      if (
+        lastSuccess?.props?.args?.[1]?.params !== context.params
+      ){
+        console.log('______________context params change', lastSuccess?.props?.args?.[1]?.params, context.params)
+      }
+    }
+    if (
+      lastSuccess?.props?.args?.[0] !== component
+    ){
+      console.log('______________component change')
+    }
+    console.log('throwing run')
     throw source!.runp(component, context)
   }
 
   read() // throws in pending and error
+  if (state.status === Status.pending) {
+    // hydrated with pending while there is nothing
+    throw infinitePromise()
+  }
+
   if (
     lastSuccess &&
     lastSuccess.status === Status.success &&
     React.isValidElement(lastSuccess.data)) {
     return lastSuccess.data
   }
+
+  console.log('rendering', state, lastSuccess, lastSuccess?.data)
   throw new Error("Should not be here");
 }
 
