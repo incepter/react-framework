@@ -1,4 +1,4 @@
-import {Get, Render, Resource} from "../decorators";
+import {Get, Post, Render, Resource} from "../decorators";
 import Users from "../components/Users";
 import * as React from "react";
 import UserPostsDetails from "../components/UserPosts";
@@ -6,9 +6,14 @@ import UserDetailsComponent from "../components/UserDetailsComponent";
 
 @Resource({path: "/users"})
 export class UserResource {
+  @Post()
+  @Render()
+  PushIntoUsers() {
+    return <Users />
+  }
   @Get()
   @Render()
-  GetUsers({query}) {
+  GetUsers() {
     return <Users />
   }
   @Render()

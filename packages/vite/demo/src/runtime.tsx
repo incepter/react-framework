@@ -124,7 +124,7 @@ export function UseAsyncComponent({
 export function UseComponent({
   component,
 }: {
-  component: AsyncComponent,
+  component: React.FC<{params, search, pathname}>,
 }) {
   let params = useParams()
   let location = useLocation()

@@ -10,11 +10,11 @@ import {
   PreAuthorize,
   Put,
   Render,
-  Resource
+  Resource, UseServer
 } from "../src/decorators";
 import {
   ClassDeclaration,
-  Decorator,
+  Decorator, FunctionDeclaration,
   MethodDeclaration,
   ObjectLiteralExpression,
   Project,
@@ -57,7 +57,7 @@ type LimitlessRouteConfig = {
   children?: Record<string, LimitlessRouteConfig>
 }
 
-function getPathFromDecorator(
+export function getPathFromDecorator(
   decorator: Decorator, defaultValue = '"/"'): string {
   let config = decorator.getArguments()[0];
   let path = defaultValue
@@ -82,14 +82,16 @@ type MethodApi = {
     Patch?: boolean,
     Delete?: boolean,
     Render?: boolean,
+    UseServer?: boolean,
   }
 }
 
 function scanMethodsForApi(
   methods: MethodDeclaration[], basePath: string): MethodApis {
+  let flatRouting = {}
   let methodAPIs: MethodApis = {}
   let hasFrameworkAPIs = false;
-  console.log(`processing methods of file ${methods[0]?.getSourceFile().getFilePath()}`)
+  // console.log(`processing methods of file ${methods[0]?.getSourceFile().getFilePath()}`)
   for (let method of methods) {
     for (let decorator of method.getDecorators()) {
       let result = parseDecorator(decorator);
@@ -113,8 +115,9 @@ function scanMethodsForApi(
           methodAPIs[methodName].method = routeMethod;
           methodAPIs[methodName].shortPath = result.path;
           methodAPIs[methodName].routePath = `${basePath}${result.path}`;
-          console.log(`[[API] Found API route of type ${routeMethod} and path ${methodAPIs[methodName].routePath}]`)
+          // console.log(`[[API] Found API route of type ${routeMethod} and path ${methodAPIs[methodName].routePath}]`)
           methodAPIs[methodName].decorators[result.decoratorName] = true;
+          flatRouting[methodAPIs[methodName].routePath] = methodAPIs[methodName];
         } else {
           methodAPIs[methodName].decorators[result.decoratorName] = true;
         }
@@ -124,6 +127,8 @@ function scanMethodsForApi(
       }
     }
   }
+
+  console.log('flat routing is', flatRouting)
   return hasFrameworkAPIs ? methodAPIs : null
 }
 
@@ -268,6 +273,7 @@ export function parseDecorator(
   if (Decorators[name]) {
     switch (name) {
       case Render.name:
+      case UseServer.name:
       case PreAuthorize.name: {
         decorator.remove()
         return {
@@ -292,7 +298,7 @@ export function parseDecorator(
   return null;
 }
 
-function moveDeclarationsToFile(
+export function moveDeclarationsToFile(
   method: MethodDeclaration,
   targetFile: SourceFile,
 ) {
@@ -324,7 +330,7 @@ function moveDeclarationsToFile(
 
 }
 
-function cloneFunctionIntoFile(
+export function cloneFunctionIntoFile(
   method: MethodDeclaration,
   sourceFile: SourceFile,
   functionName: string
@@ -341,7 +347,7 @@ function cloneFunctionIntoFile(
   });
 }
 
-function makeLimitilessFunction(
+export function makeLimitilessFunction(
   functionName: string,
   originalFunctionName: string,
   routePath: string
@@ -358,7 +364,7 @@ export default function ${functionName}() {
 }`
 }
 
-function makeAsyncLimitilessFunction(
+export function makeAsyncLimitilessFunction(
   functionName: string,
   originalFunctionName: string,
   routePath: string
@@ -374,7 +380,6 @@ export default function ${functionName}() {
   )
 }`
 }
-
 
 function registerMethod(
   rootDir: string,
@@ -395,8 +400,12 @@ function registerMethod(
   let filePath = path.join(dirName, `${className}_${method.getName()}.${extension}`);
   let sourceFile = project.createSourceFile(filePath, undefined, {overwrite: true})
 
+  if (apiConfig.decorators.UseServer) {
+    sourceFile.addStatements("'use server';")
+  }
+
   if (hasRender) {
-    addCodeToFile(sourceFile, `import * as React from "react"`)
+    addCodeToFile(sourceFile, `import * as React from "react";`)
   }
   moveDeclarationsToFile(method, sourceFile)
   cloneFunctionIntoFile(method, sourceFile, `original${method.getName()}`)

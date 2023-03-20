@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "devssr": "vite",
+    "devssr": "vite --config vite.config.ssr.client.ts",
     "build:csr": "tsc && vite build --config vite.config.csr.ts",
     "build:ssr": "tsc && vite build --config vite.config.ssr.client.ts",
     "build": "tsc && vite build",
@@ -16,9 +16,9 @@
     "axios": "^1.3.4",
     "express": "^4.18.2",
     "lodash": "^4.17.21",
-    "react": "^18.2.0",
+    "react": "0.0.0-experimental-47cf4e578-20230315",
     "react-async-states": "^1.1.1",
-    "react-dom": "^18.2.0",
+    "react-dom": "0.0.0-experimental-47cf4e578-20230315",
     "react-router-dom": "^6.9.0"
   },
   "devDependencies": {

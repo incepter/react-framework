@@ -53,6 +53,12 @@ export function Put(config?: ResourceMappingConfig) {
   };
 }
 
+export function UseServer() {
+  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element> (
+    target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+  };
+}
+
 export type PreAuthorizeConfig = {
   hasRole?: ({principal}) => boolean
 }
@@ -72,7 +78,9 @@ export let Decorators = {
   [Patch.name]: {},
   [Put.name]: {},
   [PreAuthorize.name]: {},
+  [UseServer.name]: {},
 }
+
 
 
 export function Configuration() {

@@ -1,14 +1,22 @@
-import {Get, Post, PreAuthorize, Render, Resource} from "../decorators";
+import {
+  Get,
+  Post,
+  PreAuthorize,
+  Render,
+  Resource,
+  UseServer
+} from "../demo/src/decorators";
 import * as React from "react";
 import axios from "axios";
 import {Link, Outlet} from "react-router-dom";
-import Layout from "../components/Layout";
+import Layout from "../demo/src/components/Layout";
 
 
 @Resource({path: "/posts"})
 export class PostResource {
 
   @Render()
+  @UseServer()
   @Get({path: "/:id"})
   async PostDetails({params: {id}}) {
     console.log('start getting post details', id)
