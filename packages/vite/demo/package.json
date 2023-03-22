@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --config vite.config.csr.ts",
     "devssr": "vite --config vite.config.ssr.client.ts",
     "build:csr": "tsc && vite build --config vite.config.csr.ts",
     "build:ssr": "tsc && vite build --config vite.config.ssr.client.ts",

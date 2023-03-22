@@ -5,11 +5,12 @@ import {
   Render,
   Resource,
   UseServer
-} from "../demo/src/decorators";
+} from "../decorators";
 import * as React from "react";
 import axios from "axios";
-import {Link, Outlet} from "react-router-dom";
-import Layout from "../demo/src/components/Layout";
+import Layout, {Link} from "../components/Layout";
+import {Outlet} from "../_router";
+import PostsList from "../components/posts";
 
 
 @Resource({path: "/posts"})
@@ -37,13 +38,7 @@ export class PostResource {
     console.log('start getting posts')
     // @ts-ignore
     let posts = await axios.get(`https://jsonplaceholder.typicode.com/posts/`)
-    return <div>
-      <Layout/>Hello! /posts root! <hr/>
-      <Outlet/>
-      {posts.data.map(post => (
-        <li key={post.id}><Link  to={`${post.id}`}>{post.id} - {post.title}</Link></li>
-      )) }
-    </div>
+    return <PostsList posts={posts} />
   }
 
   @Render()

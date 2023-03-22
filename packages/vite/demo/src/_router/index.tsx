@@ -1,43 +1,277 @@
-import * as React from "react";
+import * as React from "react"
 
-function createRegex(pattern: string): RegExp {
-  const regexPattern = pattern.replace(/:\w+/g, '([^/]+)').replace(/\*/g, '(.*)');
-  return new RegExp(`^${regexPattern}$`);
+
+export type Routing = {
+  Get: Record<string, { path: string, element: JSX.Element }>,
+  Post: Record<string, { path: string, element: JSX.Element }>,
 }
-function extractParams(pattern: string, match: RegExpExecArray): Record<string, string> {
-  const keys = (pattern.match(/:\w+/g) || []).map((key) => key.substring(1));
-  const params: Record<string, string> = {};
 
-  for (let i = 0; i < keys.length; i++) {
-    params[keys[i]] = match[i + 1];
+export type RoutingTreeElement = {
+  path: string,
+  config: { path: string, element: JSX.Element },
+  children?: Record<string, RoutingTreeElement>,
+}
+
+export type RoutingTree = {
+  Get: Record<string, RoutingTreeElement>,
+  Post: Record<string, RoutingTreeElement>,
+}
+
+export type MatchTree = {
+  router: Return
+  location: {
+    pathname: string,
+    search?: string,
+  },
+  config: RoutingTreeElement | null,
+  matches: Record<string, { match: Record<string, any>, config?: RoutingTreeElement }>
+}
+
+function createRoutingTree(routing: Routing): RoutingTree {
+  return Object.entries(routing).reduce(
+    (result, [method, routes]) => {
+      result[method] = createRoutingTreeFromRoutingPart(routes);
+      return result;
+    },
+    {} as RoutingTree
+  );
+}
+
+
+export function createBrowserRouter(routing: Routing) {
+  let routingTree = createRoutingTree(routing)
+  let currentMatch: MatchTree | undefined = routerMatch(window.location.pathname, routingTree.Get);
+  if (currentMatch) {
+    currentMatch.location.search = window.location.search
+    currentMatch.location.pathname = window.location.search
   }
 
-  return params;
+  let listenersIndex = 0;
+  let liveSubscriptionsIndex = 0;
+  let listeners: Record<number, Function> = {};
+
+  function subscribe(cb: Function) {
+    let id = ++listenersIndex;
+    listeners[id] = cb;
+    if (liveSubscriptionsIndex === 0) {
+      window.addEventListener("popstate", onRouteChange);
+    }
+    liveSubscriptionsIndex += 1;
+    return () => {
+      delete listeners[id]
+      liveSubscriptionsIndex -= 1
+
+      if (liveSubscriptionsIndex === 0) {
+        window.removeEventListener("popstate", onRouteChange);
+      }
+    };
+  }
+
+  function onRouteChange() {
+    currentMatch = routerMatch(window.location.pathname, routingTree.Get);
+    if (currentMatch) {
+      currentMatch.location.search = window.location.search
+      currentMatch.location.pathname = window.location.search
+    }
+    Object.values(listeners).forEach((l) => (l ? l(currentMatch) : undefined));
+  }
+
+  return {
+    subscribe,
+    onRouteChange,
+    getCurrent: () => currentMatch,
+    match(url, method = "Get") {
+      return routerMatch(url, routingTree[method]);
+    }
+  };
 }
 
+function createRoutingTreeFromRoutingPart(gets): Record<string, RoutingTreeElement> {
+  let getsResult = {};
+  for (let [path, config] of Object.entries(gets)) {
+    if (path === "/") {
+      if (!getsResult["/"]) {
+        getsResult["/"] = {};
+      }
+      getsResult["/"].config = config;
+      continue;
+    }
 
+    let currentParent = getsResult;
+    let pathSegmentsToCheck = path.split("/").filter((t) => t.trim() !== "");
 
+    for (let i = 0, {length} = pathSegmentsToCheck; i < length; i += 1) {
+      let isLatest = i === length - 1;
+      let segment = pathSegmentsToCheck[i];
 
-function matchPath(currentUrlSegment: string, possibleRoutePaths: Route[]) {
-  for (const route of possibleRoutePaths) {
-    const regex = createRegex(route.pattern);
-    const match = regex.exec(currentUrlSegment);
-    if (match) {
-      const params = extractParams(route.pattern, match);
-      return { handler: route.handler, params };
+      if (!currentParent[segment]) {
+        currentParent[segment] = {};
+      }
+
+      if (isLatest) {
+        currentParent[segment].path = path;
+        currentParent[segment].config = config;
+      } else {
+        if (!currentParent[segment].children) {
+          currentParent[segment].children = {};
+        }
+        currentParent = currentParent[segment].children;
+      }
+    }
+  }
+  return getsResult;
+}
+
+function routerMatch(
+  url: string,
+  routingTree: Record<string, RoutingTreeElement>
+): MatchTree | undefined {
+  if (url === "/" && routingTree["/"]) {
+    return {
+      location: {pathname: "/"},
+      config: routingTree["/"],
+      matches: {
+        "/": {match: {}, config: routingTree["/"]}
+      }
+    };
+  }
+
+  let cumulativeSegment = "";
+  let currentTree = routingTree;
+
+  let matchTree: MatchTree = {
+    matches: {},
+    config: null,
+    location: {pathname: url}
+  };
+
+  for (let urlSegment of url.split("/").filter((t) => t.trim() !== "")) {
+    if (currentTree[urlSegment]) {
+      let config = currentTree[urlSegment].config;
+      cumulativeSegment += `/${urlSegment}`;
+      if (config) {
+        matchTree.matches[cumulativeSegment] = {config: undefined, match: {}};
+      }
+
+      if (!matchTree.config) {
+        matchTree.config = currentTree[urlSegment]
+      }
+      currentTree = currentTree[urlSegment].children!;
+    } else {
+      let firstMatchingFragment;
+      Object.entries(currentTree).forEach(
+        ([pathFragment, configuredRouting]) => {
+          if (pathFragment.startsWith(":")) {
+            if (!firstMatchingFragment) {
+              firstMatchingFragment = pathFragment;
+            }
+            if (!matchTree.matches[configuredRouting.path]) {
+              matchTree.matches[configuredRouting.path] = {
+                config: undefined,
+                match: {}
+              };
+            }
+            let propName = pathFragment.slice(1);
+            matchTree.matches[configuredRouting.path].match[propName] = urlSegment;
+          }
+        }
+      );
+      if (firstMatchingFragment) {
+        if (!matchTree.config) {
+          matchTree.config = currentTree[firstMatchingFragment]
+        }
+        matchTree.matches[cumulativeSegment].config = currentTree[firstMatchingFragment];
+        currentTree = currentTree[firstMatchingFragment].children!;
+        cumulativeSegment += `/${firstMatchingFragment}`;
+      }
     }
   }
 
-  return null;
+  return !Object.keys(matchTree.matches).length ? undefined : matchTree;
 }
 
-function createRouter(routes) {
-  return function intercept(request: Request) {
-    let url = request.url
-    let segments = url.split("/").filter(t => !!t && t.trim() !== "")
+let RouterContext = React.createContext<ReturnType<typeof createBrowserRouter> | undefined>(undefined);
+let RoutingContext = React.createContext<MatchTree | undefined>(undefined);
 
+let OutletBoundary = React.createContext<Record<string, RoutingTreeElement> | undefined>(undefined);
 
+let OutletContext = React.createContext<Record<string, string> | undefined>(undefined);
 
-
+function renderRootMatch(rootElement: RoutingTreeElement | null) {
+  if (!rootElement) {
+    console.warn("element root is warn, probably a bug")
+    return null;
   }
+  let childrenOutlets = rootElement.children;
+  if (!childrenOutlets) {
+    return rootElement.config.element
+  }
+
+  // todo: support routes like /res-512/sayHi directly without needing outlet
+  return (
+    <OutletBoundary.Provider value={childrenOutlets}>
+      {rootElement.config.element}
+    </OutletBoundary.Provider>
+  )
+}
+
+export function RouterProvider({
+  router,
+}: { router: ReturnType<typeof createBrowserRouter> }) {
+  let match = React.useSyncExternalStore(router.subscribe, router.getCurrent)
+
+
+  let children = React.useMemo(() => match ? renderRootMatch(match!.config) : null, [match])
+
+
+  if (!match) {
+    console.warn("No match from router !")
+    return null
+  }
+
+  return (
+    <RouterContext.Provider value={router}>
+      <RoutingContext.Provider value={match}>
+        {children}
+      </RoutingContext.Provider>
+    </RouterContext.Provider>
+  )
+}
+
+export function Outlet() {
+  let match = React.useContext(RoutingContext)
+  let context = React.useContext(OutletBoundary)
+
+
+  if (!context) {
+    return null
+  }
+
+  return Object.values(context).map(config => {
+    if (match!.matches[config.path]) {
+      return (
+        <OutletBoundary.Provider key={config.path} value={config.children}>
+          <OutletContext.Provider value={match!.matches[config.path].match}>
+            {config.config.element}
+          </OutletContext.Provider>
+        </OutletBoundary.Provider>
+      )
+    }
+
+    return null;
+  })
+
+}
+
+
+export function useParams() {
+  return React.useContext(OutletContext)
+}
+
+export function useLocation() {
+  return React.useContext(RoutingContext)?.location
+}
+
+export function useRouter() {
+  return React.useContext(RouterContext)!
 }

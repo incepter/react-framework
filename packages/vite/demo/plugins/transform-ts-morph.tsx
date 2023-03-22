@@ -181,7 +181,7 @@ export default function transformTsMorph(): Plugin {
     routing: Record<string, FlatRouting>
   ) {
 
-    let routingFileImports = 'import * as React from "react";\n\n'
+    let routingFileImports = 'import * as React from "react";\nimport {RunCSRApp} from "../runtime";\n'
     let routingFileExports = ''
 
     let indexFileExports = ''
@@ -229,13 +229,14 @@ export default function transformTsMorph(): Plugin {
         console.log('processed in', Date.now() - now)
       }
       allMethodRoutesRouting += '}'
-      routingFileExports += `'${httpMethod.toLocaleLowerCase()}': ${allMethodRoutesRouting},`
+      routingFileExports += `'${httpMethod}': ${allMethodRoutesRouting},`
     }
-    routingFileExports = `export const routing = Object.freeze({${routingFileExports}});`
+    routingFileExports = `export const routing = Object.freeze({${routingFileExports}});\n\n`
+    routingFileExports += `RunCSRApp(routing);\n\n`
 
     console.log('__________', routingFileExports)
 
-    fs.writeFileSync(tempDir + "/routing.tsx", routingFileImports + routingFileExports)
+    fs.writeFileSync(tempDir + "/client.tsx", routingFileImports + routingFileExports)
     fs.writeFileSync(tempDir + "/index.tsx", indexFileImports + indexFileExports)
     // return await Promise.all(work.map(t => t()))
   }

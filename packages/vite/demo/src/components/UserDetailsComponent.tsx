@@ -1,6 +1,6 @@
 import React from "react";
 import Layout from "./Layout";
-import {Outlet} from "react-router-dom";
+import {Outlet} from "../_router";
 
 export default function UserDetailsComponent() {
   return (

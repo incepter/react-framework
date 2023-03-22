@@ -10,7 +10,6 @@ export default defineConfig({
       external: [
         'react',
         'react-dom',
-        'react-router-dom',
         'react-dom/server',
         'express'
       ],
@@ -25,7 +24,6 @@ export default defineConfig({
           react: 'React',
           express: 'express',
           'react-dom': 'ReactDOM',
-          'react-router-dom': 'ReactRouterDOM',
           'react-dom/server': 'ReactDOMServer',
         },
         // format: "esm"

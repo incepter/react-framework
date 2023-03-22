@@ -2,13 +2,13 @@ import * as React from "react";
 import ReactDOM from "react-dom/client";
 import {useAsyncState} from "react-async-states";
 
+import {ProducerProps, Status} from "async-states";
 import {
   createBrowserRouter,
   RouterProvider,
-  useLocation, useParams
-} from "react-router-dom"
-
-import {ProducerProps, Status} from "async-states";
+  useLocation,
+  useParams
+} from "./_router";
 
 
 type State = {
@@ -115,9 +115,9 @@ export function UseAsyncComponent({
   let location = useLocation()
   let context = React.useMemo(() => ({
     params,
-    search: location.search,
-    pathname: location.pathname,
-  }), [params, location.search, location.pathname])
+    search: location?.search,
+    pathname: location?.pathname,
+  }), [params, location?.search, location?.pathname])
   return use(componentKey, component, context)
 }
 
@@ -130,8 +130,8 @@ export function UseComponent({
   let location = useLocation()
   let context = React.useMemo(() => ({
     params,
-    search: location.search,
-    pathname: location.pathname,
+    search: location?.search,
+    pathname: location?.pathname,
   }), [params, location])
   return component(context)
 }
