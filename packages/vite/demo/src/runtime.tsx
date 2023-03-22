@@ -1,10 +1,10 @@
 import * as React from "react";
 import ReactDOM from "react-dom/client";
-import {useAsyncState} from "react-async-states";
+import {Hydration, useAsyncState} from "react-async-states";
 
 import {ProducerProps, Status} from "async-states";
 import {
-  createBrowserRouter,
+  createBrowserRouter, createStaticRouter,
   RouterProvider,
   useLocation,
   useParams
@@ -36,14 +36,13 @@ export function use(
   component: AsyncComponentType,
   context: any, // framework context
 ): JSX.Element | null {
-  console.log('rendering', {component, context})
   let {source, state, read, lastSuccess} = useAsyncState({
     key,
     resetStateOnDispose: true,
     producer: limitlessUseProducer,
   }, [key])
 
-  console.log('will check', state.status, lastSuccess?.status, lastSuccess?.props?.args)
+  // console.log('will check', state.status, lastSuccess?.status, lastSuccess?.props?.args)
   if (
     state.status === Status.initial ||
     (
@@ -88,7 +87,7 @@ export function use(
     return lastSuccess.data
   }
 
-  console.log('rendering', state, lastSuccess, lastSuccess?.data)
+  // console.log('rendering', state, lastSuccess, lastSuccess?.data)
   throw new Error("Should not be here");
 }
 
@@ -128,6 +127,8 @@ export function UseComponent({
 
   let context = React.useMemo(() => ({
     params,
+    body: undefined,
+    context: undefined,
     search: location.search,
     pathname: location.pathname,
   }), [params, location])
@@ -197,3 +198,42 @@ export function RunCSRApp(routing) {
     </React.StrictMode>
   )
 }
+
+export function RunSSRApp(routing) {
+  let router = createStaticRouter(routing)
+  return function interceptRequest(request) {
+    let requestRouter = router(request)
+    return (
+      <html>
+      <head>
+        <meta charSet="utf-8"/>
+        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <title>My app</title>
+      </head>
+      <body>
+      <div id="root">
+        <React.StrictMode>
+          <Hydration context={request}>
+            <Application>
+              <RouterProvider router={requestRouter} />
+            </Application>
+          </Hydration>
+        </React.StrictMode>
+      </div>
+      </body>
+      </html>
+    )
+  }
+}
+
+export function renderClientApp(routing) {
+  let router = createBrowserRouter(routing)
+  return (
+    <React.StrictMode>
+      <Application>
+        <RouterProvider router={router}/>
+      </Application>
+    </React.StrictMode>
+  )
+}
+

@@ -88,6 +88,27 @@ export function createBrowserRouter(routing: Routing) {
   };
 }
 
+export function createStaticRouter(routing: Routing) {
+  return function perRequestRouter(request: Request) {
+    let {url} = request
+    let routingTree = createRoutingTree(routing)
+    let currentMatch: MatchTree | undefined = routerMatch(url, routingTree.Get);
+    if (currentMatch) {
+      currentMatch.location.search = "search"
+      currentMatch.location.pathname = url
+    }
+
+    return {
+      onRouteChange: () => {},
+      subscribe: () => () => {},
+      getCurrent: () => currentMatch,
+      match(url, method = "Get") {
+        return routerMatch(url, routingTree[method]);
+      }
+    };
+  }
+}
+
 function createRoutingTreeFromRoutingPart(gets): Record<string, RoutingTreeElement> {
   let getsResult = {};
   for (let [path, config] of Object.entries(gets)) {
@@ -220,7 +241,7 @@ function renderRootMatch(rootElement: RoutingTreeElement | null) {
 export function RouterProvider({
   router,
 }: { router: ReturnType<typeof createBrowserRouter> }) {
-  let match = React.useSyncExternalStore(router.subscribe, router.getCurrent)
+  let match = React.useSyncExternalStore(router.subscribe, router.getCurrent, router.getCurrent)
   let children = React.useMemo(() => match ? renderRootMatch(match!.config) : null, [match])
   if (!match) {
     console.warn("No match from router !")

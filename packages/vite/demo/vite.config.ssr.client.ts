@@ -16,7 +16,7 @@ export default defineConfig({
       preserveEntrySignatures: "strict",
       input: {
         server: "src/.limitless/server.js",
-        // client: "src/.limitless/client.tsx",
+        client: "index.html",
       },
       output: {
         // inlineDynamicImports: false,

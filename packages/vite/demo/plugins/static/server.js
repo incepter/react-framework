@@ -1,6 +1,6 @@
 import express from "express";
 import ReactDOMServer from 'react-dom/server';
-import App from "./main";
+import App from "./server-entry";
 
 const app = express();
 const port = process.env.PORT ?? 3000;

@@ -4,19 +4,17 @@ import fs from 'fs'
 import {Plugin} from 'vite'
 import {MethodDeclaration, Project, SourceFile} from 'ts-morph'
 import {
-  parseMethodText,
-  configureLimitlessApp,
-  constructClientSideApp, FileImports,
+  FileImports,
   getLimitlessAPIFromFile,
   getPathFromDecorator,
   LimitlessFile,
-  makeAsyncLimitilessFunction, makeLimitilessFunction,
-  scanForNeededDeclarations,
+  makeAsyncLimitilessFunction,
+  makeLimitilessFunction,
   parseDecorator,
-  parseProjectAPI
+  parseMethodText,
+  scanForNeededDeclarations
 } from "./helpers";
-import {Configuration, Get, Resource} from "../src/decorators";
-import {addCodeToFile} from "./file-utils";
+import {Get, Resource} from "../src/decorators";
 
 
 type SingleFlatRoute = {
@@ -142,7 +140,9 @@ export default function transformTsMorph(): Plugin {
     //   performWork()
     // },
     generateBundle() {
+      console.log('generate bundle', buildMode)
       if (buildMode === "ssr") {
+        console.log('èèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèè')
         let entryPoints = [tempDir + "/client.tsx"]
         esbuild
           .build({
@@ -176,11 +176,23 @@ export default function transformTsMorph(): Plugin {
     fs.writeFileSync(tempDir + `/routing-raw.tsx`, `export let routing = ${JSON.stringify(rt, omitNodeReplacer, 2)}`)
   }
 
-  async function constructClientSideBundle(
-    routing: Record<string, FlatRouting>
+  function constructBundle(
+    routing: Record<string, FlatRouting>,
+    mode: "csr" | "ssr" | "rsc"
   ) {
+    if (mode === "csr") {
+      constructClientBundle(routing)
+    }
+    if (mode === "ssr") {
+      constructServerBundle(routing)
+    }
+  }
 
-    let routingFileImports = 'import * as React from "react";\nimport {RunCSRApp} from "../runtime";\n'
+
+  function constructClientBundle(
+    routing: Record<string, FlatRouting>,
+  ) {
+    let routingFileImports = `import * as React from "react";\nimport {RunCSRApp}} from "../runtime";\n`
     let routingFileExports = ''
 
     let indexFileExports = ''
@@ -233,10 +245,101 @@ export default function transformTsMorph(): Plugin {
     routingFileExports = `export const routing = Object.freeze({${routingFileExports}});\n\n`
     routingFileExports += `RunCSRApp(routing);\n\n`
 
-
     fs.writeFileSync(tempDir + "/client.tsx", routingFileImports + routingFileExports)
     fs.writeFileSync(tempDir + "/index.tsx", indexFileImports + indexFileExports)
   }
+
+  function constructServerBundle(
+    routing: Record<string, FlatRouting>,
+  ) {
+
+    let routingFileImports = `import * as React from "react";\n`
+    let routingFileExports = ``
+    //
+    // let clientEntryImports = `import * as React from "react";\n`
+    // let clientEntryExports = ``
+    //
+    // let serverEntryImports = ``
+    // let serverEntryExports = ``
+
+
+    // let clientAppImports = `\`import * as React from "react";\\nimport {RunSSRApp} from "../runtime";\\n\``
+    // let routingFileImports = `import * as React from "react";\nimport {${appRunnerName}} from "../runtime";\n`
+    //
+    // let routingFileExports = ''
+
+    // let serverAppSetupImports = ''
+    // let serverAppSetupExports = ''
+
+    let indexFileExports = ''
+    let indexFileImports = 'import * as React from "react";\n\n'
+    for (let [httpMethod, allRoutes] of Object.entries(routing)) {
+      let allMethodRoutesRouting = `{`
+      for (let [fullPath, elementConfig] of Object.entries(allRoutes)) {
+        let declarations: FileImports = {
+          react: {
+            from: "react",
+            default: "React",
+          }
+        }
+        let now = Date.now()
+        let middleDir = "/shared/"
+        if (elementConfig.decorators.UseServer) {
+          middleDir = "/server/"
+        }
+        if (elementConfig.decorators.UseClient) {
+          middleDir = "/server/"
+        }
+
+        let ext = elementConfig.decorators.Render ? ".tsx" : ".ts"
+        let functionName = elementConfig.componentName;
+        let relativeFilePath = "." + middleDir + functionName
+        let targetFile = tempDir + middleDir + functionName + ext
+        let file = project.createSourceFile(targetFile, undefined, {overwrite: true})
+
+        let targetFunction = elementConfig.node;
+        let realLimitlessComponent = targetFunction.isAsync() ?
+          makeAsyncLimitilessFunction(functionName, `original${functionName}`, fullPath) :
+          makeLimitilessFunction(functionName, `original${functionName}`, fullPath)
+
+        routingFileImports += `import { Lazy_${functionName} } from "./index";\n`
+        indexFileExports += `export const Lazy_${functionName} = React.lazy(() => import("${relativeFilePath}"));\n`
+
+        scanForNeededDeclarations(targetFunction, file, declarations)
+        file.addStatements(formatImports(declarations))
+        file.addStatements(realLimitlessComponent.imports)
+        file.addStatements("\n\n" + parseMethodText(targetFunction, file, `original${functionName}`))
+        file.addStatements(realLimitlessComponent.code)
+
+        file.save()
+        allMethodRoutesRouting += `'${fullPath}': {path: '${fullPath}', element: ${elementConfig.element}},`
+        console.log(`processed [${functionName}] in`, Date.now() - now)
+      }
+      allMethodRoutesRouting += '}'
+      routingFileExports += `'${httpMethod}': ${allMethodRoutesRouting},`
+    }
+    routingFileExports = `export const routing = Object.freeze({${routingFileExports}});\n`
+
+    fs.writeFileSync(tempDir + "/routing.tsx", routingFileImports + routingFileExports)
+    fs.writeFileSync(tempDir + "/index.tsx", indexFileImports + indexFileExports)
+    fs.writeFileSync(tempDir + "/client.tsx", `import * as React from "react";
+import {routing} from "./routing";
+import {renderClientApp} from "../runtime";
+import {hydrateRoot} from "react-dom/client";
+
+hydrateRoot(document.getElementById('root') as HTMLDivElement, renderClientApp(routing));
+`)
+    fs.writeFileSync(tempDir + "/server-entry.tsx", `import * as React from "react";
+import {routing} from "./routing";
+import {RunSSRApp} from "../runtime";
+
+let interceptApp = RunSSRApp(routing);
+export default interceptApp;
+`)
+      let serverJs = config.root + "/plugins/static/server.js";
+      fs.copyFileSync(serverJs, tempDir + "/server.js");
+  }
+
 
   async function performWork() {
     prepareWorkDir();
@@ -248,12 +351,12 @@ export default function transformTsMorph(): Plugin {
     let flatRouting = performFlatRouting(project, sources)
 
     // if (buildMode === "csr") {
-    constructClientSideBundle(flatRouting)
+    constructBundle(flatRouting, buildMode)
     // }
-
 
     // console.log('flat routing is', flatRouting)
     saveRoutingFile(flatRouting)
+
 
     // console.log('got this flat routing', flatRouting.get("Get"))
     // let limitlessConfig = parseProjectAPI(targetedFiles)
@@ -270,8 +373,6 @@ export default function transformTsMorph(): Plugin {
     //   fs.appendFileSync(`${tempDir}/main.tsx`, constructServerSideApp(routing))
     //   fs.appendFileSync(`${tempDir}/client.tsx`, constructServerClientApp(routing))
     //
-    //   let serverJs = config.root + "/plugins/static/server.js";
-    //   fs.copyFileSync(serverJs, tempDir + "/server.js");
     // config.build.rollupOptions.input.server = tempDir + "/server.js";
     // config.build.rollupOptions.input.client = config.root + "/index.html";
     // }
@@ -346,8 +447,8 @@ function formatImports(declarations: FileImports) {
   Object.values(declarations)
     .forEach(t => {
       let hasDefault = !!t.default
-      let hasNamed = !!t.named && Object.keys(t.named).length >  0
-      let hasNamespace = !!t.namespace && Object.keys(t.namespace).length >  0
+      let hasNamed = !!t.named && Object.keys(t.named).length > 0
+      let hasNamespace = !!t.namespace && Object.keys(t.namespace).length > 0
 
       str += 'import '
       if (hasDefault) {
@@ -368,7 +469,7 @@ function formatImports(declarations: FileImports) {
         str += ' } '
       }
 
-      str +=  `from "${t.from}";\n`
+      str += `from "${t.from}";\n`
     })
 
   return str;
