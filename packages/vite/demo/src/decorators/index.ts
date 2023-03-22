@@ -1,3 +1,5 @@
+import * as React from "react";
+
 export type ResourceConfig = {
   path: string
 }
@@ -18,43 +20,55 @@ type RenderFunctionType<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Ele
 type RouteFunctionType<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element> = (RenderFunctionType<T>)
 
 export function Render() {
-  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element> (
-    target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<RenderFunctionType<T>>) {
+  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element>(
+    target: any, propertyKey: string,
+    descriptor: TypedPropertyDescriptor<RenderFunctionType<T>>
+  ) {
   };
 }
 
 export function Get(config?: ResourceMappingConfig) {
-  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element> (
-    target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<RouteFunctionType<T>>) {
+  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element>(
+    target: any, propertyKey: string,
+    descriptor: TypedPropertyDescriptor<RouteFunctionType<T>>
+  ) {
   };
 }
 
 export function Post(config?: ResourceMappingConfig) {
-  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element> (
-    target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<RouteFunctionType<T>>) {
+  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element>(
+    target: any, propertyKey: string,
+    descriptor: TypedPropertyDescriptor<RouteFunctionType<T>>
+  ) {
   };
 }
 
 export function Patch(config?: ResourceMappingConfig) {
-  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element> (
-    target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<RouteFunctionType<T>>) {
+  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element>(
+    target: any, propertyKey: string,
+    descriptor: TypedPropertyDescriptor<RouteFunctionType<T>>
+  ) {
   };
 }
 
 export function Delete(config?: ResourceMappingConfig) {
-  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element> (
-    target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<RouteFunctionType<T>>) {
+  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element>(
+    target: any, propertyKey: string,
+    descriptor: TypedPropertyDescriptor<RouteFunctionType<T>>
+  ) {
   };
 }
 
 export function Put(config?: ResourceMappingConfig) {
-  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element> (
-    target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<RouteFunctionType<T>>) {
+  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element>(
+    target: any, propertyKey: string,
+    descriptor: TypedPropertyDescriptor<RouteFunctionType<T>>
+  ) {
   };
 }
 
 export function UseServer() {
-  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element> (
+  return function impl<T extends (JSX.Element | Promise<JSX.Element>) = JSX.Element>(
     target: any, propertyKey: string, descriptor: PropertyDescriptor) {
   };
 }
@@ -82,7 +96,6 @@ export let Decorators = {
 }
 
 
-
 export function Configuration() {
   return function (constructor: Function) {
   }
@@ -101,14 +114,11 @@ export function Inject(name: string) {
 }
 
 
-
-
-
-
-
 export function Filter() {
   return function (
-    target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<FilterType>) {
+    target: any, propertyKey: string,
+    descriptor: TypedPropertyDescriptor<FilterType>
+  ) {
   };
 }
 
@@ -122,5 +132,23 @@ export type FilterContext<P, C> = {
 }
 
 export type FilterType = {
-  (request: Request, response: Response, context: FilterContext<any, any>, next: () => void): void
+  (
+    request: Request, response: Response, context: FilterContext<any, any>,
+    next: () => void
+  ): void
 }
+
+type Params<shape> = {
+  [k in keyof shape]: string
+}
+
+export type RouteArgv = {
+  body: any,
+  context: any,
+  pathname: string,
+  search: string | undefined,
+  params: Record<string, string>,
+}
+
+export type ComponentType = React.FC<RouteArgv>
+export type AsyncComponentType = (argv: RouteArgv) => Promise<JSX.Element>

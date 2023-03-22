@@ -4,18 +4,17 @@ import fs from 'fs'
 import {Plugin} from 'vite'
 import {MethodDeclaration, Project, SourceFile} from 'ts-morph'
 import {
-  cloneFunctionIntoFile,
+  parseMethodText,
   configureLimitlessApp,
-  constructClientSideApp,
+  constructClientSideApp, FileImports,
   getLimitlessAPIFromFile,
   getPathFromDecorator,
   LimitlessFile,
   makeAsyncLimitilessFunction, makeLimitilessFunction,
-  moveDeclarationsToFile,
+  scanForNeededDeclarations,
   parseDecorator,
   parseProjectAPI
 } from "./helpers";
-import {constructServerClientApp, constructServerSideApp} from "./server";
 import {Configuration, Get, Resource} from "../src/decorators";
 import {addCodeToFile} from "./file-utils";
 
@@ -186,15 +185,17 @@ export default function transformTsMorph(): Plugin {
 
     let indexFileExports = ''
     let indexFileImports = 'import * as React from "react";\n\n'
-    // let work = []
     for (let [httpMethod, allRoutes] of Object.entries(routing)) {
       let allMethodRoutesRouting = `{`
       for (let [fullPath, elementConfig] of Object.entries(allRoutes)) {
-        let now = Date.now()
-        console.log('processing', httpMethod, fullPath, elementConfig.name)
-
+        let declarations: FileImports = {
+          react: {
+            from: "react",
+            default: "React",
+          }
+        }
+        // let now = Date.now()
         let middleDir = "/shared/"
-
         if (elementConfig.decorators.UseServer) {
           middleDir = "/server/"
         }
@@ -216,17 +217,15 @@ export default function transformTsMorph(): Plugin {
         routingFileImports += `import { Lazy_${functionName} } from "./index";\n`
         indexFileExports += `export const Lazy_${functionName} = React.lazy(() => import("${relativeFilePath}"));\n`
 
-        // work.push(() => Promise.resolve().then(() => {
-        //
-        // }))
-        addCodeToFile(file, 'import * as React from "react";\n')
-        moveDeclarationsToFile(targetFunction, file)
-        cloneFunctionIntoFile(targetFunction, file, `original${functionName}`)
-        addCodeToFile(file, realLimitlessComponent)
+        scanForNeededDeclarations(targetFunction, file, declarations)
+        file.addStatements(formatImports(declarations))
+        file.addStatements(realLimitlessComponent.imports)
+        file.addStatements("\n\n" + parseMethodText(targetFunction, file, `original${functionName}`))
+        file.addStatements(realLimitlessComponent.code)
 
         file.save()
         allMethodRoutesRouting += `'${fullPath}': {path: '${fullPath}', element: ${elementConfig.element}},`
-        console.log('processed in', Date.now() - now)
+        // console.log('processed in', Date.now() - now)
       }
       allMethodRoutesRouting += '}'
       routingFileExports += `'${httpMethod}': ${allMethodRoutesRouting},`
@@ -234,11 +233,9 @@ export default function transformTsMorph(): Plugin {
     routingFileExports = `export const routing = Object.freeze({${routingFileExports}});\n\n`
     routingFileExports += `RunCSRApp(routing);\n\n`
 
-    console.log('__________', routingFileExports)
 
     fs.writeFileSync(tempDir + "/client.tsx", routingFileImports + routingFileExports)
     fs.writeFileSync(tempDir + "/index.tsx", indexFileImports + indexFileExports)
-    // return await Promise.all(work.map(t => t()))
   }
 
   async function performWork() {
@@ -342,4 +339,37 @@ function reviver(key, value) {
     }
   }
   return value;
+}
+
+function formatImports(declarations: FileImports) {
+  let str = ''
+  Object.values(declarations)
+    .forEach(t => {
+      let hasDefault = !!t.default
+      let hasNamed = !!t.named && Object.keys(t.named).length >  0
+      let hasNamespace = !!t.namespace && Object.keys(t.namespace).length >  0
+
+      str += 'import '
+      if (hasDefault) {
+        str += `${t.default}${hasNamed || hasNamespace ? ', ' : ' '}`
+      }
+
+      if (hasNamespace) {
+        str += Object.keys(t.namespace).map(t => `* as ${t}`).join(", ") + " "
+      }
+
+      if (hasNamed) {
+        str += '{ '
+      }
+      if (hasNamed) {
+        str += Object.keys(t.named).join(", ")
+      }
+      if (hasNamed) {
+        str += ' } '
+      }
+
+      str +=  `from "${t.from}";\n`
+    })
+
+  return str;
 }

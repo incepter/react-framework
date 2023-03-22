@@ -8,8 +8,6 @@ import {
 } from "../decorators";
 import * as React from "react";
 import axios from "axios";
-import Layout, {Link} from "../components/Layout";
-import {Outlet} from "../_router";
 import PostsList from "../components/posts";
 
 
@@ -19,9 +17,9 @@ export class PostResource {
   @Render()
   @UseServer()
   @Get({path: "/:id"})
-  async PostDetails({params: {id}}) {
-    console.log('start getting post details', id)
-    let postDetails = await axios.get(`https://jsonplaceholder.typicode.com/posts/${id}`)
+  async PostDetails({params}) {
+    console.log('start getting post details', params.id)
+    let postDetails = await axios.get(`https://jsonplaceholder.typicode.com/posts/${params.id}`)
     return (
       <details open>
         <pre>

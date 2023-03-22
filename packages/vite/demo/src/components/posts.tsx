@@ -9,7 +9,7 @@ export default function PostsList({posts}) {
     <Outlet/>
     {posts.data.map(post => (
       <li key={post.id}><Link
-        to={`${post.id}`}>{post.id} - {post.title}</Link></li>
+        to={`/posts/${post.id}`}>{post.id} - {post.title}</Link></li>
     ))}
   </div>
 }

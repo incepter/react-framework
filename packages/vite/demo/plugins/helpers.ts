@@ -20,7 +20,7 @@ import {
   Project,
   PropertyAssignment,
   SourceFile,
-  SyntaxKind,
+  SyntaxKind, Node, Identifier, ImportDeclaration,
 } from "ts-morph";
 import {addCodeToFile} from "./file-utils";
 
@@ -298,62 +298,98 @@ export function parseDecorator(
   return null;
 }
 
-export function moveDeclarationsToFile(
-  method: MethodDeclaration,
-  targetFile: SourceFile,
-) {
-  method.getDescendantsOfKind(SyntaxKind.Identifier).forEach(identifier => {
-    let symbol = identifier.getSymbol();
-    if (symbol) {
-      let declarations = symbol.getDeclarations();
-      declarations.forEach(declaration => {
-        let importDeclaration = declaration.getFirstAncestorByKind(SyntaxKind.ImportDeclaration);
-        if (importDeclaration) {
+export type FileImports = Record<string,
+  {
+    from: string,
+    default?: string,
+    named?: Record<string, true>,
+    namespace?: Record<string, true>,
+  }>
 
-          let isRelative = importDeclaration.isModuleSpecifierRelative()
-          let resolvedModuleSpecifier = isRelative ? targetFile.getRelativePathAsModuleSpecifierTo(
-            importDeclaration.getModuleSpecifierSourceFile()?.getFilePath() ?? importDeclaration.getModuleSpecifierValue()
-          ) : importDeclaration.getModuleSpecifierValue()
-
-          let namespaceImport = importDeclaration.getNamespaceImport()?.getText();
-
-          targetFile.addImportDeclaration({
-            defaultImport: importDeclaration.getDefaultImport()?.getText(),
-            namespaceImport: namespaceImport ? namespaceImport.substring(namespaceImport.lastIndexOf(' as ') + 4) : undefined,
-            namedImports: importDeclaration.getNamedImports()?.map(t => t.getName()),
-            moduleSpecifier: resolvedModuleSpecifier
-          });
-        }
-      });
-    }
-  });
-
+function visitNode(node: Node, visitor: (node: Node) => void): void {
+  visitor(node);
+  node.forEachChild(child => visitNode(child, visitor));
 }
 
-export function cloneFunctionIntoFile(
+export function scanForNeededDeclarations(
+  method: MethodDeclaration,
+  targetFile: SourceFile,
+  output: FileImports
+) {
+  // targetFile.getRelativePathAsModuleSpecifierTo(
+  //   importDeclaration.getModuleSpecifierSourceFile()?.getFilePath() ?? importDeclaration.getModuleSpecifierValue()
+  // )
+  let methodText = method.getText();
+  method.forEachDescendant((node) => {
+    if (node.getKind() === SyntaxKind.Identifier) {
+      let identifier = node as Identifier;
+      let symbol = identifier.getSymbol();
+      if (!symbol) {
+        return false;
+      }
+      symbol
+        .getDeclarations()
+        .forEach(declaration => {
+          let importDeclaration = declaration.getFirstAncestorByKind(SyntaxKind.ImportDeclaration)
+          if (importDeclaration) {
+            let isRelative = importDeclaration.isModuleSpecifierRelative()
+            let namespaceImport = importDeclaration.getNamespaceImport()?.getText()
+            let defaultImportName = importDeclaration.getDefaultImport()?.getText()
+            let named = importDeclaration.getNamedImports().reduce((
+              a, t) => (a[t.getName()] = true, a), {});
+            let resolvedModuleSpecifier = isRelative ?
+              path.relative(
+                path.dirname(targetFile.getFilePath()),
+                importDeclaration.getModuleSpecifierSourceFile().getFilePath()
+              ).replace(/\\/g, "/").replace(/\.tsx?$/, "")
+              :
+              importDeclaration.getModuleSpecifierValue()
+
+            if (!output[resolvedModuleSpecifier]) {
+              output[resolvedModuleSpecifier] = {
+                from: resolvedModuleSpecifier,
+              }
+            }
+            let current = output[resolvedModuleSpecifier]
+            if (namespaceImport) {
+              if (!current.namespace) {
+                current.namespace = {}
+              }
+              current.namespace[namespaceImport] = true;
+            }
+
+            current.default = defaultImportName
+            if (importDeclaration.getNamedImports()) {
+              if (!current.named) {
+                current.named = {}
+              }
+              Object.assign(current.named, named)
+            }
+          }
+        })
+    }
+  });
+}
+
+export function parseMethodText(
   method: MethodDeclaration,
   sourceFile: SourceFile,
   functionName: string
 ) {
-  return sourceFile.addFunction({
-    name: functionName,
-    isAsync: method.isAsync(),
-    parameters: method.getParameters().map(param => ({
-      name: param.getName(),
-      type: param.getType().getText()
-    })),
-    returnType: method.getReturnType().getText(),
-    statements: method.getStatements().map(stmt => stmt.getText())
-  });
+
+  let methodContent = method.getText().replace(method.getName(), functionName)
+  return method.isAsync() ? methodContent.replace("async", "async function") : ("function " + methodContent)
 }
 
 export function makeLimitilessFunction(
   functionName: string,
   originalFunctionName: string,
   routePath: string
-) {
-  return `import { UseComponent, SuspenseWrapper } from "../../runtime"
+): LimitlessFnOutput {
 
+  return {
+    imports: `import { UseComponent, SuspenseWrapper } from "../../runtime";`,
+    code: `
 // ROUTE = ${routePath}
 export default function ${functionName}() {
   return (
@@ -361,16 +397,24 @@ export default function ${functionName}() {
         <UseComponent component={${originalFunctionName}} />
     </SuspenseWrapper>
   )
-}`
+}
+`
+  }
+}
+
+export type LimitlessFnOutput = {
+  code: string,
+  imports: string,
 }
 
 export function makeAsyncLimitilessFunction(
   functionName: string,
   originalFunctionName: string,
   routePath: string
-) {
-  return `import { UseAsyncComponent, SuspenseWrapper } from "../../runtime"
-
+): LimitlessFnOutput {
+  return {
+    imports: `import { UseAsyncComponent, SuspenseWrapper } from "../../runtime";`,
+    code: `
 // ROUTE = ${routePath}
 export default function ${functionName}() {
   return (
@@ -378,55 +422,9 @@ export default function ${functionName}() {
         <UseAsyncComponent componentKey="${functionName}" component={${originalFunctionName}} />
     </SuspenseWrapper>
   )
-}`
 }
-
-function registerMethod(
-  rootDir: string,
-  project: Project,
-  className: string,
-  method: MethodDeclaration,
-  outDir: string,
-  apiConfig: MethodApi,
-) {
-  console.log(`registering ${className}_${method.getName()} in file ${method.getSourceFile().getFilePath()}`)
-  let methodName = method.getName();
-  let dirName = `${outDir}/${className}`;
-  fs.mkdirSync(dirName, {recursive: true});
-
-  let hasRender = !!apiConfig.decorators.Render
-
-  let extension = hasRender ? "tsx" : "ts"
-  let filePath = path.join(dirName, `${className}_${method.getName()}.${extension}`);
-  let sourceFile = project.createSourceFile(filePath, undefined, {overwrite: true})
-
-  if (apiConfig.decorators.UseServer) {
-    sourceFile.addStatements("'use server';")
+`
   }
-
-  if (hasRender) {
-    addCodeToFile(sourceFile, `import * as React from "react";`)
-  }
-  moveDeclarationsToFile(method, sourceFile)
-  cloneFunctionIntoFile(method, sourceFile, `original${method.getName()}`)
-  addCodeToFile(
-    sourceFile,
-    method.isAsync() ?
-      makeAsyncLimitilessFunction(`${className}_${methodName}`, `original${methodName}`, apiConfig.routePath) :
-      makeLimitilessFunction(`${className}_${methodName}`, `original${methodName}`, apiConfig.routePath)
-  )
-
-  sourceFile.saveSync()
-  let componentName = `Lazy_${className}_${methodName}`;
-  let textToAppend = hasRender ?
-    `\nexport let ${componentName} = React.lazy(() => import("./${className}/${className}_${methodName}"));`
-    :
-    `\nexport { default as ${componentName} } from "./${className}/${className}_${methodName}";`
-
-  fs.appendFileSync(
-    `${outDir}/index.ts`,
-    textToAppend
-  );
 }
 
 export function getRoutingAsString(

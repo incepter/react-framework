@@ -9,6 +9,7 @@ import {
   useLocation,
   useParams
 } from "./_router";
+import {AsyncComponentType, ComponentType} from "./decorators";
 
 
 type State = {
@@ -16,19 +17,14 @@ type State = {
   data: JSX.Element | null,
   promise?: Promise<JSX.Element>,
 }
-let initial: State = {
-  status: "initial",
-  data: null,
-}
 
 async function limitlessUseProducer(
-  props: ProducerProps<JSX.Element, Error, never, [AsyncComponent, any]>
+  props: ProducerProps<JSX.Element, Error, never, [AsyncComponentType, any]>
 ) {
   let [component, context] = props.args
   return await component(context ?? {})
 }
 
-type AsyncComponent = (context: any) => Promise<JSX.Element>
 
 function infinitePromise() {
   return new Promise(resolve => {
@@ -37,7 +33,7 @@ function infinitePromise() {
 
 export function use(
   key: string,
-  component: AsyncComponent,
+  component: AsyncComponentType,
   context: any, // framework context
 ): JSX.Element | null {
   console.log('rendering', {component, context})
@@ -62,18 +58,18 @@ export function use(
     if (
       lastSuccess?.props?.args?.[1] !== context
     ){
-      console.log('______________context change', lastSuccess?.props?.args?.[1], context)
+      // console.log('______________context change', lastSuccess?.props?.args?.[1], context)
 
       if (
         lastSuccess?.props?.args?.[1]?.params !== context.params
       ){
-        console.log('______________context params change', lastSuccess?.props?.args?.[1]?.params, context.params)
+        // console.log('______________context params change', lastSuccess?.props?.args?.[1]?.params, context.params)
       }
     }
     if (
       lastSuccess?.props?.args?.[0] !== component
     ){
-      console.log('______________component change')
+      // console.log('______________component change')
     }
     console.log('throwing run')
     throw source!.runp(component, context)
@@ -109,7 +105,7 @@ export function UseAsyncComponent({
   component,
 }: {
   componentKey: string,
-  component: AsyncComponent,
+  component: AsyncComponentType,
 }) {
   let params = useParams()
   let location = useLocation()
@@ -121,18 +117,21 @@ export function UseAsyncComponent({
   return use(componentKey, component, context)
 }
 
+
 export function UseComponent({
   component,
 }: {
-  component: React.FC<{params, search, pathname}>,
+  component: ComponentType,
 }) {
   let params = useParams()
   let location = useLocation()
+
   let context = React.useMemo(() => ({
     params,
-    search: location?.search,
-    pathname: location?.pathname,
+    search: location.search,
+    pathname: location.pathname,
   }), [params, location])
+
   return component(context)
 }
 

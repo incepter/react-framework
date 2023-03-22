@@ -1,4 +1,5 @@
 import {Get, Post, Render, Resource, UseServer} from "../decorators";
+import Layout from "../components/Layout";
 
 @Resource({path: "/"})
 export default class Home {
@@ -8,6 +9,12 @@ export default class Home {
   @Get({path: ""})
   HomePage() {
     console.log('rendering home !')
-    return <h1>Hello, World!</h1>
+    return (
+      <>
+        <h1>Hello, World!</h1>
+        <hr />
+        <Layout />
+      </>
+    )
   }
 }

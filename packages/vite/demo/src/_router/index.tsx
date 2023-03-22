@@ -18,7 +18,9 @@ export type RoutingTree = {
 }
 
 export type MatchTree = {
-  router: Return
+  context?: any,
+  request?: Request,
+  response?: Response,
   location: {
     pathname: string,
     search?: string,
@@ -219,11 +221,7 @@ export function RouterProvider({
   router,
 }: { router: ReturnType<typeof createBrowserRouter> }) {
   let match = React.useSyncExternalStore(router.subscribe, router.getCurrent)
-
-
   let children = React.useMemo(() => match ? renderRootMatch(match!.config) : null, [match])
-
-
   if (!match) {
     console.warn("No match from router !")
     return null
@@ -238,7 +236,7 @@ export function RouterProvider({
   )
 }
 
-export function Outlet() {
+export function Outlet(): any {
   let match = React.useContext(RoutingContext)
   let context = React.useContext(OutletBoundary)
 
@@ -260,18 +258,14 @@ export function Outlet() {
 
     return null;
   })
-
 }
-
 
 export function useParams() {
-  return React.useContext(OutletContext)
+  return React.useContext(OutletContext)!
 }
-
 export function useLocation() {
-  return React.useContext(RoutingContext)?.location
+  return React.useContext(RoutingContext)!.location!
 }
-
 export function useRouter() {
   return React.useContext(RouterContext)!
 }
