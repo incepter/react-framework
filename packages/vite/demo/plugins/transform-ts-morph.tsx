@@ -5,9 +5,7 @@ import {Plugin} from 'vite'
 import {MethodDeclaration, Project, SourceFile} from 'ts-morph'
 import {
   FileImports,
-  getLimitlessAPIFromFile,
   getPathFromDecorator,
-  LimitlessFile,
   makeAsyncLimitilessFunction,
   makeLimitilessFunction,
   parseDecorator,
@@ -142,7 +140,6 @@ export default function transformTsMorph(): Plugin {
     generateBundle() {
       console.log('generate bundle', buildMode)
       if (buildMode === "ssr") {
-        console.log('èèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèèè')
         let entryPoints = [tempDir + "/client.tsx"]
         esbuild
           .build({
@@ -160,7 +157,6 @@ export default function transformTsMorph(): Plugin {
               '.tsx': 'tsx',
             },
           })
-          .then(() => console.log('_____________esbuild end___________'))
           .catch(() => process.exit(1));
       }
 
@@ -171,10 +167,6 @@ export default function transformTsMorph(): Plugin {
       await performWork()
     },
   };
-
-  function saveRoutingFile(rt) {
-    fs.writeFileSync(tempDir + `/routing-raw.tsx`, `export let routing = ${JSON.stringify(rt, omitNodeReplacer, 2)}`)
-  }
 
   function constructBundle(
     routing: Record<string, FlatRouting>,
@@ -255,21 +247,6 @@ export default function transformTsMorph(): Plugin {
 
     let routingFileImports = `import * as React from "react";\n`
     let routingFileExports = ``
-    //
-    // let clientEntryImports = `import * as React from "react";\n`
-    // let clientEntryExports = ``
-    //
-    // let serverEntryImports = ``
-    // let serverEntryExports = ``
-
-
-    // let clientAppImports = `\`import * as React from "react";\\nimport {RunSSRApp} from "../runtime";\\n\``
-    // let routingFileImports = `import * as React from "react";\nimport {${appRunnerName}} from "../runtime";\n`
-    //
-    // let routingFileExports = ''
-
-    // let serverAppSetupImports = ''
-    // let serverAppSetupExports = ''
 
     let indexFileExports = ''
     let indexFileImports = 'import * as React from "react";\n\n'
@@ -344,40 +321,10 @@ export default interceptApp;
   async function performWork() {
     prepareWorkDir();
     prepareProjectAndAddFiles();
-
     buildMode = resolveBuildMode();
-    // let targetedFiles = scanSources();
 
     let flatRouting = performFlatRouting(project, sources)
-
-    // if (buildMode === "csr") {
     constructBundle(flatRouting, buildMode)
-    // }
-
-    // console.log('flat routing is', flatRouting)
-    saveRoutingFile(flatRouting)
-
-
-    // console.log('got this flat routing', flatRouting.get("Get"))
-    // let limitlessConfig = parseProjectAPI(targetedFiles)
-    // console.log('==>', limitlessConfig)
-    // let routing = configureLimitlessApp(config.root, project, limitlessConfig);
-
-
-    // if (buildMode === "csr") {
-    //   fs.appendFileSync(`${tempDir}/client.tsx`, constructClientSideApp(routing))
-    // config.build.rollupOptions.input.client = tempDir + "/client.tsx";
-    // }
-
-    // if (buildMode === "ssr") {
-    //   fs.appendFileSync(`${tempDir}/main.tsx`, constructServerSideApp(routing))
-    //   fs.appendFileSync(`${tempDir}/client.tsx`, constructServerClientApp(routing))
-    //
-    // config.build.rollupOptions.input.server = tempDir + "/server.js";
-    // config.build.rollupOptions.input.client = config.root + "/index.html";
-    // }
-    // @ts-ignore
-    // config.build.rollupOptions.input.limitless = tempDir;
   }
 
   function prepareWorkDir() {
@@ -393,21 +340,6 @@ export default interceptApp;
     sources = project.addSourceFilesAtPaths(config.root + '/src/**/*.tsx');
   }
 
-  function scanSources() {
-    let output: { sourceFile: SourceFile, limitlessAPI: LimitlessFile }[] = []
-    for (let sourceFile of sources) {
-      let fileAPI = getLimitlessAPIFromFile(sourceFile)
-      if (fileAPI.resources.length || fileAPI.configurations.length) {
-        console.log(`[[Resource] - Found resource in file ${sourceFile.getFilePath()}]`)
-        output.push({
-          sourceFile,
-          limitlessAPI: getLimitlessAPIFromFile(sourceFile)
-        })
-      }
-    }
-    return output;
-  }
-
   function resolveBuildMode(): "csr" | "ssr" | "rsc" {
     let filePath = config.root + "/.limitless.json";
     try {
@@ -419,27 +351,6 @@ export default interceptApp;
       return "csr"
     }
   }
-
-}
-
-function replacer(key, value) {
-  if (value instanceof Map) {
-    return {
-      dataType: 'Map',
-      value: Array.from(value.entries()), // or with spread: value: [...value]
-    };
-  } else {
-    return value;
-  }
-}
-
-function reviver(key, value) {
-  if (typeof value === 'object' && value !== null) {
-    if (value.dataType === 'Map') {
-      return new Map(value.value);
-    }
-  }
-  return value;
 }
 
 function formatImports(declarations: FileImports) {

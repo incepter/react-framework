@@ -22,7 +22,6 @@ import {
   SourceFile,
   SyntaxKind, Node, Identifier, ImportDeclaration,
 } from "ts-morph";
-import {addCodeToFile} from "./file-utils";
 
 export function getProperty(
   obj: ObjectLiteralExpression, prop: string): string | undefined {
