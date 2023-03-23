@@ -45,7 +45,7 @@ export function createBrowserRouter(routing: Routing) {
   let currentMatch: MatchTree | undefined = routerMatch(window.location.pathname, routingTree.Get);
   if (currentMatch) {
     currentMatch.location.search = window.location.search
-    currentMatch.location.pathname = window.location.search
+    currentMatch.location.pathname = window.location.pathname
   }
 
   let listenersIndex = 0;
@@ -73,8 +73,10 @@ export function createBrowserRouter(routing: Routing) {
     currentMatch = routerMatch(window.location.pathname, routingTree.Get);
     if (currentMatch) {
       currentMatch.location.search = window.location.search
-      currentMatch.location.pathname = window.location.search
+      currentMatch.location.pathname = window.location.pathname
     }
+    console.log('here change', currentMatch?.location)
+
     Object.values(listeners).forEach((l) => (l ? l(currentMatch) : undefined));
   }
 
@@ -91,16 +93,21 @@ export function createBrowserRouter(routing: Routing) {
 export function createStaticRouter(routing: Routing) {
   return function perRequestRouter(request: Request) {
     let {url} = request
+    let indexOfQuestionMark = url.indexOf("?")
+    let pathname = indexOfQuestionMark > -1 ? url.slice(0, indexOfQuestionMark) : url
+    let search = indexOfQuestionMark > -1 ? url.slice(indexOfQuestionMark) : ''
     let routingTree = createRoutingTree(routing)
-    let currentMatch: MatchTree | undefined = routerMatch(url, routingTree.Get);
+    let currentMatch: MatchTree | undefined = routerMatch(pathname, routingTree.Get);
     if (currentMatch) {
-      currentMatch.location.search = "search"
-      currentMatch.location.pathname = url
+      currentMatch.location.search = search
+      currentMatch.location.pathname = pathname
     }
 
     return {
-      onRouteChange: () => {},
-      subscribe: () => () => {},
+      onRouteChange: () => {
+      },
+      subscribe: () => () => {
+      },
       getCurrent: () => currentMatch,
       match(url, method = "Get") {
         return routerMatch(url, routingTree[method]);
@@ -109,18 +116,18 @@ export function createStaticRouter(routing: Routing) {
   }
 }
 
-function createRoutingTreeFromRoutingPart(gets): Record<string, RoutingTreeElement> {
-  let getsResult = {};
-  for (let [path, config] of Object.entries(gets)) {
+function createRoutingTreeFromRoutingPart(parts): Record<string, RoutingTreeElement> {
+  let result = {};
+  for (let [path, config] of Object.entries(parts)) {
     if (path === "/") {
-      if (!getsResult["/"]) {
-        getsResult["/"] = {};
+      if (!result["/"]) {
+        result["/"] = {};
       }
-      getsResult["/"].config = config;
+      result["/"].config = config;
       continue;
     }
 
-    let currentParent = getsResult;
+    let currentParent = result;
     let pathSegmentsToCheck = path.split("/").filter((t) => t.trim() !== "");
 
     for (let i = 0, {length} = pathSegmentsToCheck; i < length; i += 1) {
@@ -142,7 +149,7 @@ function createRoutingTreeFromRoutingPart(gets): Record<string, RoutingTreeEleme
       }
     }
   }
-  return getsResult;
+  return result;
 }
 
 function routerMatch(
@@ -213,12 +220,10 @@ function routerMatch(
   return !Object.keys(matchTree.matches).length ? undefined : matchTree;
 }
 
-let RouterContext = React.createContext<ReturnType<typeof createBrowserRouter> | undefined>(undefined);
-let RoutingContext = React.createContext<MatchTree | undefined>(undefined);
-
-let OutletBoundary = React.createContext<Record<string, RoutingTreeElement> | undefined>(undefined);
-
-let OutletContext = React.createContext<Record<string, string> | undefined>(undefined);
+export let RouterContext = React.createContext<ReturnType<typeof createBrowserRouter> | undefined>(undefined);
+export let RoutingContext = React.createContext<MatchTree | undefined>(undefined);
+export let OutletBoundary = React.createContext<Record<string, RoutingTreeElement> | undefined>(undefined);
+export let OutletContext = React.createContext<Record<string, string> | undefined>(undefined);
 
 function renderRootMatch(rootElement: RoutingTreeElement | null) {
   if (!rootElement) {
@@ -230,9 +235,12 @@ function renderRootMatch(rootElement: RoutingTreeElement | null) {
     return rootElement.config.element
   }
 
-  // todo: support routes like /res-512/sayHi directly without needing outlet
+  if (rootElement.children && !rootElement.config) {
+    return Object.values(rootElement.children).map(t => renderRootMatch(t))
+  }
+
   return (
-    <OutletBoundary.Provider value={childrenOutlets}>
+    <OutletBoundary.Provider key={rootElement.path} value={childrenOutlets}>
       {rootElement.config.element}
     </OutletBoundary.Provider>
   )
@@ -284,9 +292,11 @@ export function Outlet(): any {
 export function useParams() {
   return React.useContext(OutletContext)!
 }
+
 export function useLocation() {
   return React.useContext(RoutingContext)!.location!
 }
+
 export function useRouter() {
   return React.useContext(RouterContext)!
 }

@@ -1,5 +1,10 @@
 import React from "react";
-import {useRouter} from "../_router";
+import {
+  OutletBoundary,
+  OutletContext, RouterContext,
+  RoutingContext, useLocation,
+  useRouter
+} from "../_router";
 
 export default function Layout() {
   return (
@@ -18,7 +23,6 @@ export function Link({to, children, ...rest}, {to: string, children: any}) {
   return (
     <a onClick={e => {
       e.preventDefault();
-      console.log("click");
       // @ts-ignore
       const href = e.target.getAttribute("href");
       window.history.pushState(null, "", href);

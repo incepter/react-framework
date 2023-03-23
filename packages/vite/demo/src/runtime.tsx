@@ -11,13 +11,6 @@ import {
 } from "./_router";
 import {AsyncComponentType, ComponentType} from "./decorators";
 
-
-type State = {
-  status: "initial" | "pending" | "error" | "success",
-  data: JSX.Element | null,
-  promise?: Promise<JSX.Element>,
-}
-
 async function limitlessUseProducer(
   props: ProducerProps<JSX.Element, Error, never, [AsyncComponentType, any]>
 ) {
@@ -25,69 +18,54 @@ async function limitlessUseProducer(
   return await component(context ?? {})
 }
 
-
-function infinitePromise() {
-  return new Promise(resolve => {
-  })
-}
-
 export function use(
   key: string,
   component: AsyncComponentType,
   context: any, // framework context
 ): JSX.Element | null {
-  let {source, state, read, lastSuccess} = useAsyncState({
+  let {source, state, read, lastSuccess, version} = useAsyncState({
     key,
-    resetStateOnDispose: true,
+    // resetStateOnDispose: true,
     producer: limitlessUseProducer,
   }, [key])
 
-  // console.log('will check', state.status, lastSuccess?.status, lastSuccess?.props?.args)
-  if (
-    state.status === Status.initial ||
-    (
-      state.status !== Status.pending &&
-      (
-        lastSuccess?.props?.args?.[1]?.params !== context.params ||
-        lastSuccess?.props?.args?.[1]?.pathname !== context.pathname ||
-        lastSuccess?.props?.args?.[0] !== component
-      )
-    )
-  ) {
-    if (
-      lastSuccess?.props?.args?.[1] !== context
-    ){
-      // console.log('______________context change', lastSuccess?.props?.args?.[1], context)
+  let isInitial = state.status === Status.initial
+  let didSucceed = lastSuccess?.status === Status.success
 
-      if (
-        lastSuccess?.props?.args?.[1]?.params !== context.params
-      ){
-        // console.log('______________context params change', lastSuccess?.props?.args?.[1]?.params, context.params)
+  if (isInitial) {
+    throw source!.runp(component, context)
+  } else {
+    let prevInputs = lastSuccess!.props?.args!
+    let newContextEntries = Object.values(context)
+    let prevContextEntries = Object.values(prevInputs[1] || {})
+
+    let didInputsChange = prevInputs[0] !== component
+    if (newContextEntries.length !== prevContextEntries.length) {
+      didInputsChange = true
+    }
+
+    for (let i = 0; i < prevContextEntries.length; i += 1) {
+      // @ts-ignore
+      if (newContextEntries[i] !== prevContextEntries[i]) {
+        didInputsChange = true
+        break;
       }
     }
-    if (
-      lastSuccess?.props?.args?.[0] !== component
-    ){
-      // console.log('______________component change')
+
+    if (didInputsChange) {
+      throw source!.runp(component, context)
     }
-    console.log('throwing run')
-    throw source!.runp(component, context)
   }
 
+  let isInIncompleteHydration = state.status === Status.pending && version === 0
+  if (isInIncompleteHydration) {
+    throw new Error("Incomplete hydration state")
+  }
   read() // throws in pending and error
-  if (state.status === Status.pending) {
-    // hydrated with pending while there is nothing
-    throw infinitePromise()
-  }
 
-  if (
-    lastSuccess &&
-    lastSuccess.status === Status.success &&
-    React.isValidElement(lastSuccess.data)) {
-    return lastSuccess.data
+  if (didSucceed && React.isValidElement(lastSuccess!.data)) {
+    return lastSuccess!.data
   }
-
-  // console.log('rendering', state, lastSuccess, lastSuccess?.data)
   throw new Error("Should not be here");
 }
 
@@ -108,11 +86,15 @@ export function UseAsyncComponent({
 }) {
   let params = useParams()
   let location = useLocation()
+
   let context = React.useMemo(() => ({
     params,
-    search: location?.search,
-    pathname: location?.pathname,
-  }), [params, location?.search, location?.pathname])
+    body: undefined,
+    context: undefined,
+    search: location.search,
+    pathname: location.pathname,
+  }), [params, location.pathname, location.search])
+
   return use(componentKey, component, context)
 }
 
@@ -133,7 +115,7 @@ export function UseComponent({
     pathname: location.pathname,
   }), [params, location])
 
-  return component(context)
+  return React.createElement(component, context)
 }
 
 type AppRoutes = {}
@@ -152,31 +134,6 @@ type LimitlessApplication = {
   filters: LimitlessFilter[],
 
 }
-
-function getAndBootFilters(config: LimitlessApplicationConfig) {
-
-}
-
-// function run(config: LimitlessApplicationConfig): LimitlessApplication {
-//   let filters = getAndBootFilters(config)
-//
-//   return {
-//     filters,
-//   }
-// }
-
-// type LimitlessContext = {
-//   query?: string,
-//   request?: Request,
-//   response?: Response,
-//   body?: ReadableStream<any>,
-//   match?: Record<string, string>,
-// }
-//
-// type TT = {
-//   getCurrentContext(): LimitlessContext,
-//   run(config: LimitlessApplicationConfig): LimitlessApplication,
-// }
 
 export function Application({children}) {
   return (
@@ -215,7 +172,7 @@ export function RunSSRApp(routing) {
         <React.StrictMode>
           <Hydration context={request}>
             <Application>
-              <RouterProvider router={requestRouter} />
+              <RouterProvider router={requestRouter}/>
             </Application>
           </Hydration>
         </React.StrictMode>
@@ -236,4 +193,3 @@ export function renderClientApp(routing) {
     </React.StrictMode>
   )
 }
-

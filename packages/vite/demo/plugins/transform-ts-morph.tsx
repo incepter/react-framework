@@ -14,7 +14,6 @@ import {
 } from "./helpers";
 import {Get, Resource} from "../src/decorators";
 
-
 type SingleFlatRoute = {
   name: string,
   path: string,
@@ -26,16 +25,7 @@ type SingleFlatRoute = {
   node: MethodDeclaration,
   decorators: { [name: string]: true },
 }
-
 type FlatRouting = Record<string, SingleFlatRoute>
-
-type FlatFilters = SingleFlatRoute[]
-
-type SingleFilter = {
-  filePath: string,
-  configName: string,
-  filterName: string,
-}
 
 function performFlatRouting(
   project: Project,
@@ -117,13 +107,6 @@ function performFlatRouting(
   return flatRoutingByMethod
 }
 
-const omitNodeReplacer = (key, value) => {
-  if (key === 'node') {
-    return undefined;
-  }
-  return value;
-};
-
 /** @type {import('vite').UserConfig} */
 export default function transformTsMorph(): Plugin {
   let config;
@@ -180,11 +163,10 @@ export default function transformTsMorph(): Plugin {
     }
   }
 
-
   function constructClientBundle(
     routing: Record<string, FlatRouting>,
   ) {
-    let routingFileImports = `import * as React from "react";\nimport {RunCSRApp}} from "../runtime";\n`
+    let routingFileImports = `import * as React from "react";\nimport {RunCSRApp} from "../runtime";\n`
     let routingFileExports = ''
 
     let indexFileExports = ''

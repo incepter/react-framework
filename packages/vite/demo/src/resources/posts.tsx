@@ -18,7 +18,6 @@ export class PostResource {
   @UseServer()
   @Get({path: "/:id"})
   async PostDetails({params}) {
-    console.log('start getting post details', params.id)
     let postDetails = await axios.get(`https://jsonplaceholder.typicode.com/posts/${params.id}`)
     return (
       <details open>
@@ -33,8 +32,6 @@ export class PostResource {
   @Get()
   @Render()
   async GetPosts() {
-    console.log('start getting posts')
-    // @ts-ignore
     let posts = await axios.get(`https://jsonplaceholder.typicode.com/posts/`)
     return <PostsList posts={posts} />
   }
