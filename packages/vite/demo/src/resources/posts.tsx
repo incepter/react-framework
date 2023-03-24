@@ -1,19 +1,10 @@
-import {
-  Get,
-  Post,
-  PreAuthorize,
-  Render,
-  Resource,
-  UseServer
-} from "../decorators";
+import {Get, Render, Resource, UseServer} from "../decorators";
 import * as React from "react";
 import axios from "axios";
 import PostsList from "../components/posts";
 
-
 @Resource({path: "/posts"})
 export class PostResource {
-
   @Render()
   @UseServer()
   @Get({path: "/:id"})
@@ -29,7 +20,6 @@ export class PostResource {
     )
   }
 
-
   @Get()
   @Render()
   async GetPosts() {
@@ -37,12 +27,4 @@ export class PostResource {
     let data = postsResult.data
     return <PostsList posts={data} />
   }
-
-  @Render()
-  @PreAuthorize()
-  @Post({path: "/", produces: "application/json"})
-  AddPost({body}) {
-    return <div>Add post</div>
-  }
-
 }
