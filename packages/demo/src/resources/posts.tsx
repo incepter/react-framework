@@ -14,7 +14,7 @@ export class PostResource {
     return (
       <details open>
         <pre>
-          {JSON.stringify(postDetails, null, 4)}
+          {JSON.stringify(postDetails, null, 2)}
         </pre>
       </details>
     )
