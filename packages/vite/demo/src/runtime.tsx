@@ -2,7 +2,7 @@ import * as React from "react";
 import ReactDOM from "react-dom/client";
 import {Hydration, useAsyncState} from "react-async-states";
 
-import {ProducerProps, Status} from "async-states";
+import {ProducerProps, requestContext, Status} from "async-states";
 import {
   createBrowserRouter, createStaticRouter,
   RouterProvider,
@@ -15,13 +15,25 @@ async function limitlessUseProducer(
   props: ProducerProps<JSX.Element, Error, never, [AsyncComponentType, any]>
 ) {
   let [component, context] = props.args
-  return await component(context ?? {})
+  let element = await component(context ?? {})
+  if (isServer) {
+    return {type: element.type, props: element.props} as JSX.Element
+  }
+  return element
 }
+
+export let __DEV__ = process.env.NODE_ENV !== "production";
+export let maybeWindow = typeof window !== "undefined" ? window : undefined;
+export let isServer = typeof maybeWindow === "undefined" ||
+  !maybeWindow.document ||
+  !maybeWindow.document.createElement;
+
 
 export function use(
   key: string,
   component: AsyncComponentType,
   context: any, // framework context
+  extractedComponent,
 ): JSX.Element | null {
   let {source, state, read, lastSuccess, version} = useAsyncState({
     key,
@@ -31,12 +43,22 @@ export function use(
 
   let isInitial = state.status === Status.initial
   let didSucceed = lastSuccess?.status === Status.success
+  let didLoadFromHydration = !isInitial && version === 0
+
+  let isInIncompleteHydration = state.status === Status.pending && version === 0
+  if (didLoadFromHydration) {
+    return React.createElement(extractedComponent, lastSuccess?.data?.props)
+  }
+  if (isInIncompleteHydration) {
+    // todo: fix hydration
+    throw new Error("Incomplete hydration state")
+  }
 
   if (isInitial) {
     throw source!.runp(component, context)
   } else {
-    let prevInputs = lastSuccess!.props?.args!
     let newContextEntries = Object.values(context)
+    let prevInputs = lastSuccess!.props?.args! || []
     let prevContextEntries = Object.values(prevInputs[1] || {})
 
     let didInputsChange = prevInputs[0] !== component
@@ -57,16 +79,29 @@ export function use(
     }
   }
 
-  let isInIncompleteHydration = state.status === Status.pending && version === 0
-  if (isInIncompleteHydration) {
-    throw new Error("Incomplete hydration state")
-  }
   read() // throws in pending and error
 
-  if (didSucceed && React.isValidElement(lastSuccess!.data)) {
-    return lastSuccess!.data
+  if (didSucceed) {
+    if (isServer) {
+      console.log('returning in server !', lastSuccess!.data, context)
+      return (
+        <Hydration context={context}>
+          {React.createElement(lastSuccess!.data!.type, lastSuccess!.data!.props)}
+        </Hydration>
+      )
+    }
+    return lastSuccess!.data!
   }
   throw new Error("Should not be here");
+}
+
+function UseImpl({
+  componentKey,
+  component,
+  context,
+  extractedComponent,
+}) {
+  return use(componentKey, component, context, extractedComponent)
 }
 
 export function SuspenseWrapper({children, fallback}) {
@@ -80,9 +115,11 @@ export function SuspenseWrapper({children, fallback}) {
 export function UseAsyncComponent({
   componentKey,
   component,
+  extractedComponent,
 }: {
   componentKey: string,
   component: AsyncComponentType,
+  extractedComponent: any
 }) {
   let params = useParams()
   let location = useLocation()
@@ -95,7 +132,12 @@ export function UseAsyncComponent({
     pathname: location.pathname,
   }), [params, location.pathname, location.search])
 
-  return use(componentKey, component, context)
+  return (
+    <Hydration context={context}>
+      <UseImpl componentKey={componentKey} component={component}
+               context={context} extractedComponent={extractedComponent}/>
+    </Hydration>
+  )
 }
 
 

@@ -1,7 +1,7 @@
 import React from "react";
-import {Get, Post, Render, Resource} from "../decorators";
-import SayHi from "../components/SayHi";
-import Counter from "../components/Counter";
+import {Get, Post, Render, Resource} from "../demo/src/decorators";
+import SayHi from "../demo/src/components/SayHi";
+import Counter from "../demo/src/components/Counter";
 
 @Resource({path: "/hafi"})
 export default class Hafi {

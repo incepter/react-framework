@@ -1,5 +1,5 @@
-import {Get, Post, Render, Resource, UseServer} from "../decorators";
-import Layout from "../components/Layout";
+import {Get, Post, Render, Resource, UseServer} from "../demo/src/decorators";
+import Layout from "../demo/src/components/Layout";
 
 @Resource({path: "/"})
 export default class Home {
@@ -8,10 +8,9 @@ export default class Home {
   @UseServer()
   @Get({path: ""})
   HomePage() {
-    console.log('rendering home !')
     return (
       <>
-        <h1>Hello, World!</h1>
+        <h1>Hello, World!!!</h1>
         <hr />
         <Layout />
       </>

@@ -1,12 +1,12 @@
-import {Get, Render, Resource} from "../decorators";
+import {Get, Render, Resource} from "../demo/src/decorators";
 import React from "react";
 
 
-@Resource({path: "/devs"})
+@Resource({path: "/devss"})
 export default class DEVMAS {
 
   @Render()
-  @Get({path: "/greet"})
+  @Get({path: "/greets"})
   SayHiToDevsMa() {
     let [state, setState] = React.useState(0)
     return (

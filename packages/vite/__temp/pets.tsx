@@ -1,4 +1,4 @@
-import {Get, Render, Resource} from "../decorators";
+import {Get, Render, Resource} from "../demo/src/decorators";
 
 @Resource({path: "/pets"})
 export default class PetsResource {

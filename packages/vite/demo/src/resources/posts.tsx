@@ -17,7 +17,7 @@ export class PostResource {
   @Render()
   @UseServer()
   @Get({path: "/:id"})
-  async PostDetails({params}) {
+  async PostDetails({ params }) {
     let postDetails = await axios.get(`https://jsonplaceholder.typicode.com/posts/${params.id}`)
     return (
       <details open>
@@ -32,8 +32,9 @@ export class PostResource {
   @Get()
   @Render()
   async GetPosts() {
-    let posts = await axios.get(`https://jsonplaceholder.typicode.com/posts/`)
-    return <PostsList posts={posts} />
+    let postsResult = await axios.get(`https://jsonplaceholder.typicode.com/posts/`)
+    let data = postsResult.data
+    return <PostsList posts={data} />
   }
 
   @Render()

@@ -7,7 +7,7 @@ export default function PostsList({posts}) {
   return <div>
     <Layout/>Hello! /posts root! <hr/>
     <Outlet/>
-    {posts.data.map(post => (
+    {posts.map(post => (
       <li key={post.id}><Link
         to={`/posts/${post.id}`}>{post.id} - {post.title}</Link></li>
     ))}
