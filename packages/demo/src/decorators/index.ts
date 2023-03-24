@@ -1,4 +1,5 @@
 import * as React from "react";
+import {CurrentRouteContextType} from "../_router";
 
 export type ResourceConfig = {
   path: string
@@ -142,13 +143,4 @@ type Params<shape> = {
   [k in keyof shape]: string
 }
 
-export type RouteArgv = {
-  body: any,
-  context: any,
-  pathname: string,
-  search: string | undefined,
-  params: Record<string, string>,
-}
-
-export type ComponentType = React.FC<RouteArgv>
-export type AsyncComponentType = (argv: RouteArgv) => Promise<JSX.Element>
+export type AsyncComponentType = (argv: CurrentRouteContextType) => Promise<JSX.Element>

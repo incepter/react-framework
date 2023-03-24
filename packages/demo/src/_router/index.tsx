@@ -3,7 +3,11 @@ import * as React from "react"
 
 export type Routing = {
   Get: Record<string, { path: string, element: JSX.Element }>,
+  Put: Record<string, { path: string, element: JSX.Element }>,
   Post: Record<string, { path: string, element: JSX.Element }>,
+  Patch: Record<string, { path: string, element: JSX.Element }>,
+  Options: Record<string, { path: string, element: JSX.Element }>,
+  Delete: Record<string, { path: string, element: JSX.Element }>,
 }
 
 export type RoutingTreeElement = {
@@ -19,6 +23,7 @@ export type RoutingTree = {
 
 export type MatchTree = {
   context?: any,
+
   request?: Request,
   response?: Response,
   location: {
@@ -26,7 +31,7 @@ export type MatchTree = {
     search?: string,
   },
   config: RoutingTreeElement | null,
-  matches: Record<string, { match: Record<string, any>, config?: RoutingTreeElement }>
+  matches: Record<string, { match: Record<string, any>, config?: RoutingTreeElement, currentPath: string, }>
 }
 
 function createRoutingTree(routing: Routing): RoutingTree {
@@ -75,7 +80,6 @@ export function createBrowserRouter(routing: Routing) {
       currentMatch.location.search = window.location.search
       currentMatch.location.pathname = window.location.pathname
     }
-    console.log('here change', currentMatch?.location)
 
     Object.values(listeners).forEach((l) => (l ? l(currentMatch) : undefined));
   }
@@ -161,7 +165,7 @@ function routerMatch(
       location: {pathname: "/"},
       config: routingTree["/"],
       matches: {
-        "/": {match: {}, config: routingTree["/"]}
+        "/": {match: {}, config: routingTree["/"], currentPath: "/"}
       }
     };
   }
@@ -175,12 +179,18 @@ function routerMatch(
     location: {pathname: url}
   };
 
+  let cumulativeMatchedPath = ""
   for (let urlSegment of url.split("/").filter((t) => t.trim() !== "")) {
+    cumulativeMatchedPath += `/${urlSegment}`;
     if (currentTree[urlSegment]) {
       let config = currentTree[urlSegment].config;
       cumulativeSegment += `/${urlSegment}`;
       if (config) {
-        matchTree.matches[cumulativeSegment] = {config: undefined, match: {}};
+        matchTree.matches[cumulativeSegment] = {
+          config: undefined,
+          match: {},
+          currentPath: cumulativeMatchedPath
+        };
       }
 
       if (!matchTree.config) {
@@ -198,7 +208,8 @@ function routerMatch(
             if (!matchTree.matches[configuredRouting.path]) {
               matchTree.matches[configuredRouting.path] = {
                 config: undefined,
-                match: {}
+                match: {},
+                currentPath: cumulativeMatchedPath,
               };
             }
             let propName = pathFragment.slice(1);
@@ -217,31 +228,43 @@ function routerMatch(
     }
   }
 
+  console.log('here is the match', matchTree)
+
   return !Object.keys(matchTree.matches).length ? undefined : matchTree;
 }
+
+export type OutletContextType =
+  { params: Record<string, string>, currentPath: string }
+  | undefined
 
 export let RouterContext = React.createContext<ReturnType<typeof createBrowserRouter> | undefined>(undefined);
 export let RoutingContext = React.createContext<MatchTree | undefined>(undefined);
 export let OutletBoundary = React.createContext<Record<string, RoutingTreeElement> | undefined>(undefined);
-export let OutletContext = React.createContext<Record<string, string> | undefined>(undefined);
+export let OutletContext = React.createContext<OutletContextType | undefined>(undefined);
 
-function renderRootMatch(rootElement: RoutingTreeElement | null) {
-  if (!rootElement) {
+function RenderRootMatch({element}: { element: RoutingTreeElement | null }) {
+  if (!element) {
     console.warn("element root is warn, probably a bug")
     return null;
   }
-  let childrenOutlets = rootElement.children;
+  let childrenOutlets = element.children;
   if (!childrenOutlets) {
-    return rootElement.config.element
+    return element.config.element
   }
 
-  if (rootElement.children && !rootElement.config) {
-    return Object.values(rootElement.children).map(t => renderRootMatch(t))
+  if (element.children && !element.config) {
+    return (
+      <>
+        {Object
+          .values(element.children)
+          .map(t => <RenderRootMatch element={t} key={t.path}/>)}
+      </>
+    )
   }
 
   return (
-    <OutletBoundary.Provider key={rootElement.path} value={childrenOutlets}>
-      {rootElement.config.element}
+    <OutletBoundary.Provider key={element.path} value={childrenOutlets}>
+      {element.config.element}
     </OutletBoundary.Provider>
   )
 }
@@ -249,8 +272,12 @@ function renderRootMatch(rootElement: RoutingTreeElement | null) {
 export function RouterProvider({
   router,
 }: { router: ReturnType<typeof createBrowserRouter> }) {
-  let match = React.useSyncExternalStore(router.subscribe, router.getCurrent, router.getCurrent)
-  let children = React.useMemo(() => match ? renderRootMatch(match!.config) : null, [match])
+  let match = React.useSyncExternalStore(
+    router.subscribe, router.getCurrent, router.getCurrent)
+
+  let children = React.useMemo(
+    () => match ? <RenderRootMatch element={match!.config}/> : null, [match])
+
   if (!match) {
     console.warn("No match from router !")
     return null
@@ -269,28 +296,43 @@ export function Outlet(): any {
   let match = React.useContext(RoutingContext)
   let context = React.useContext(OutletBoundary)
 
-
   if (!context) {
     return null
   }
 
   return Object.values(context).map(config => {
-    if (match!.matches[config.path]) {
-      return (
-        <OutletBoundary.Provider key={config.path} value={config.children}>
-          <OutletContext.Provider value={match!.matches[config.path].match}>
-            {config.config.element}
-          </OutletContext.Provider>
-        </OutletBoundary.Provider>
-      )
+    let currentMatch = match!.matches[config.path];
+    if (currentMatch) {
+      return <OutletElement
+        currentPath={currentMatch?.currentPath} key={config.path}
+        config={config}
+        params={currentMatch?.match}/>
     }
 
     return null;
   })
 }
 
+function OutletElement({
+  params,
+  config,
+  currentPath,
+}: { config: RoutingTreeElement, params: Record<string, string>, currentPath }) {
+  const outletContext = React.useMemo(() => ({
+    params,
+    currentPath
+  }), [params, currentPath]);
+  return (
+    <OutletBoundary.Provider key={config.path} value={config.children}>
+      <OutletContext.Provider value={outletContext}>
+        {config.config.element}
+      </OutletContext.Provider>
+    </OutletBoundary.Provider>
+  )
+}
+
 export function useParams() {
-  return React.useContext(OutletContext)!
+  return React.useContext(OutletContext)!.params
 }
 
 export function useLocation() {
@@ -299,4 +341,21 @@ export function useLocation() {
 
 export function useRouter() {
   return React.useContext(RouterContext)!
+}
+
+export type CurrentRouteContextType = {
+  match: MatchTree,
+  currentPath: string,
+  params: Record<string, string>,
+}
+
+export function useCurrentRouteContext(): CurrentRouteContextType {
+  let match = React.useContext(RoutingContext)!
+  let currentMatch = React.useContext(OutletContext)!
+
+  return React.useMemo(() => ({
+    match,
+    params: currentMatch?.params,
+    currentPath: currentMatch?.currentPath
+  }), [currentMatch])
 }

@@ -233,15 +233,11 @@ export function makeLimitilessFunction(
 ): LimitlessFnOutput {
 
   return {
-    imports: `import { UseComponent, SuspenseWrapper } from "../../runtime";`,
+    imports: `import { renderRouteSync } from "../../runtime";`,
     code: `
 // ROUTE = ${routePath}
 export default function ${functionName}() {
-  return (
-    <SuspenseWrapper fallback="loading">
-        <UseComponent component={${originalFunctionName}} />
-    </SuspenseWrapper>
-  )
+  return renderRouteSync("${functionName}", ${originalFunctionName});
 }
 `
   }
@@ -258,19 +254,11 @@ export function makeAsyncLimitilessFunction(
   routePath: string
 ): LimitlessFnOutput {
   return {
-    imports: `import { UseAsyncComponent, SuspenseWrapper } from "../../runtime";`,
+    imports: `import { renderRouteAsync } from "../../runtime";`,
     code: `
 // ROUTE = ${routePath}
 export default function ${functionName}() {
-  return (
-    <SuspenseWrapper fallback="loading data">
-      <UseAsyncComponent 
-        componentKey="${functionName}"
-        extractedComponent={Extracted}
-        component={${originalFunctionName}}
-      />
-    </SuspenseWrapper>
-  )
+  return renderRouteAsync("${functionName}", ${originalFunctionName}, Extracted);
 }
 `
   }

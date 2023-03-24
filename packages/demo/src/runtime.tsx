@@ -6,17 +6,17 @@ import {ProducerProps, Status} from "async-states";
 import {
   createBrowserRouter,
   createStaticRouter,
+  CurrentRouteContextType, OutletBoundary, OutletContext,
   RouterProvider,
-  useLocation,
-  useParams
+  useCurrentRouteContext
 } from "./_router";
-import {AsyncComponentType, ComponentType} from "./decorators";
+import {AsyncComponentType} from "./decorators";
 
 async function limitlessUseProducer(
-  props: ProducerProps<JSX.Element, Error, never, [AsyncComponentType, any]>
+  props: ProducerProps<JSX.Element, Error, never, [AsyncComponentType, CurrentRouteContextType]>
 ) {
   let [component, context] = props.args
-  let element = await component(context ?? {})
+  let element = await component(context)
   if (isServer) {
     return {type: element.type, props: element.props} as JSX.Element
   }
@@ -33,54 +33,53 @@ export let isServer = typeof maybeWindow === "undefined" ||
 export function use(
   key: string,
   component: AsyncComponentType,
-  context: any, // framework context
+  context: CurrentRouteContextType, // framework context
   extractedComponent,
 ): JSX.Element | null {
+  let ref = React.useRef(0)
+  ++ref.current
   let {source, state, read, lastSuccess, version} = useAsyncState({
     key,
     // resetStateOnDispose: true,
     producer: limitlessUseProducer,
   }, [key])
 
-
   let didSucceed = lastSuccess?.status === Status.success
   let isInitial = source!.getState().status === Status.initial
   let didJustLoadFromHydration = !isInitial && version === 0
-  let isInIncompleteHydration = state.status === Status.pending && version === 0
 
-  if (isInIncompleteHydration) {
-    throw new Error("Incomplete hydration state")
+  let currentMatch = React.useContext(OutletBoundary)
+
+  if (!isServer) {
+    let isInIncompleteHydration = state.status === Status.pending && version === 0
+
+    if (isInIncompleteHydration) {
+      throw new Error("Incomplete hydration state")
+    }
   }
+
   if (isInitial) {
+    console.log('running', key, source!.getState(), version, ref.current)
     throw source!.runp(component, context);
   } else {
-    let newContextEntries = Object.values(context)
     let prevInputs = lastSuccess!.props?.args! || []
-    let prevContextEntries = Object.values(prevInputs[1] || {})
 
-    let didInputsChange = false
-
-    if (newContextEntries.length !== prevContextEntries.length) {
-      didInputsChange = true
-    } else {
-      for (let i = 0; i < prevContextEntries.length; i += 1) {
-        if (newContextEntries[i] !== prevContextEntries[i]) {
-          didInputsChange = true
-          break;
-        }
-      }
-    }
-
-    if (didInputsChange) {
-      throw source!.runp(component, context)
-    } else if (didJustLoadFromHydration) {
+    if (!prevInputs && didJustLoadFromHydration) {
       return React.createElement(extractedComponent, lastSuccess?.data?.props)
     }
 
-    didInputsChange = (didInputsChange && prevInputs[0] !== component)
+    let previousContext = prevInputs[1]
+    let newLocation = context.match.location
+    let previousLocation = previousContext.match.location
 
-    if (didInputsChange) {
+    if (newLocation.search !== previousLocation.search ||
+      newLocation.pathname !== previousLocation.pathname) {
+      console.log('running2', currentMatch, key, newLocation.search, previousLocation.search, newLocation.pathname, previousLocation.pathname, previousContext.params, context.params)
       throw source!.runp(component, context)
+    }
+
+    if (didJustLoadFromHydration) {
+      return React.createElement(extractedComponent, lastSuccess?.data?.props)
     }
   }
 
@@ -93,7 +92,7 @@ export function use(
   if (didSucceed) {
     if (isServer) {
       return (
-        <Hydration context={isServer ? context : staticObject}>
+        <Hydration context={context}>
           {React.createElement(lastSuccess!.data!.type, lastSuccess!.data!.props)}
         </Hydration>
       )
@@ -121,6 +120,7 @@ export function SuspenseWrapper({children, fallback}) {
 }
 
 let staticObject = {}
+
 export function UseAsyncComponent({
   componentKey,
   component,
@@ -130,44 +130,13 @@ export function UseAsyncComponent({
   component: AsyncComponentType,
   extractedComponent: any
 }) {
-  let params = useParams()
-  let location = useLocation()
-
-  let context = React.useMemo(() => ({
-    params,
-    body: undefined,
-    context: undefined,
-    search: location.search,
-    pathname: location.pathname,
-  }), [params, location.pathname, location.search])
-
+  let context = useCurrentRouteContext()
   return (
-    <Hydration context={isServer ? context : staticObject}>
-      <UseImpl componentKey={componentKey} component={component}
-               context={context} extractedComponent={extractedComponent}/>
-    </Hydration>
+    <UseImpl componentKey={componentKey} component={component}
+             context={context} extractedComponent={extractedComponent}/>
   )
 }
 
-
-export function UseComponent({
-  component,
-}: {
-  component: ComponentType,
-}) {
-  let params = useParams()
-  let location = useLocation()
-
-  let context = React.useMemo(() => ({
-    params,
-    body: undefined,
-    context: undefined,
-    search: location.search,
-    pathname: location.pathname,
-  }), [params, location])
-
-  return React.createElement(component, context)
-}
 
 type AppRoutes = {}
 type LimitlessApplicationConfig = {
@@ -242,5 +211,24 @@ export function renderClientApp(routing) {
         <RouterProvider router={router}/>
       </Application>
     </React.StrictMode>
+  )
+}
+
+export function renderRouteSync(name: string, Component: React.FC<any>) {
+  let context = useCurrentRouteContext()
+  return React.createElement(Component, context)
+}
+
+export function renderRouteAsync(
+  name: string,
+  AsyncComponent: AsyncComponentType,
+  SyncComponent: React.FC<any>
+) {
+  return (
+    <UseAsyncComponent
+      componentKey={name}
+      component={AsyncComponent}
+      extractedComponent={SyncComponent}
+    />
   )
 }
