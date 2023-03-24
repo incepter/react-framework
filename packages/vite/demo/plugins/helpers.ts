@@ -264,7 +264,11 @@ export function makeAsyncLimitilessFunction(
 export default function ${functionName}() {
   return (
     <SuspenseWrapper fallback="loading data">
-        <UseAsyncComponent componentKey="${functionName}" extractedComponent={Extracted} component={${originalFunctionName}} />
+      <UseAsyncComponent 
+        componentKey="${functionName}"
+        extractedComponent={Extracted}
+        component={${originalFunctionName}}
+      />
     </SuspenseWrapper>
   )
 }

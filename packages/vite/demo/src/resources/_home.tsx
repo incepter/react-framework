@@ -1,5 +1,5 @@
-import {Get, Post, Render, Resource, UseServer} from "../demo/src/decorators";
-import Layout from "../demo/src/components/Layout";
+import {Get, Post, Render, Resource, UseServer} from "../decorators";
+import Layout from "../components/Layout";
 
 @Resource({path: "/"})
 export default class Home {

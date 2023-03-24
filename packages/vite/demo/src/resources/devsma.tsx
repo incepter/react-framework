@@ -1,4 +1,4 @@
-import {Get, Render, Resource} from "../demo/src/decorators";
+import {Get, Render, Resource} from "../decorators";
 import React from "react";
 
 

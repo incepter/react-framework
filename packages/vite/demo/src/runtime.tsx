@@ -2,9 +2,10 @@ import * as React from "react";
 import ReactDOM from "react-dom/client";
 import {Hydration, useAsyncState} from "react-async-states";
 
-import {ProducerProps, requestContext, Status} from "async-states";
+import {ProducerProps, Status} from "async-states";
 import {
-  createBrowserRouter, createStaticRouter,
+  createBrowserRouter,
+  createStaticRouter,
   RouterProvider,
   useLocation,
   useParams
@@ -41,38 +42,42 @@ export function use(
     producer: limitlessUseProducer,
   }, [key])
 
-  let isInitial = state.status === Status.initial
-  let didSucceed = lastSuccess?.status === Status.success
-  let didLoadFromHydration = !isInitial && version === 0
 
+  let didSucceed = lastSuccess?.status === Status.success
+  let isInitial = source!.getState().status === Status.initial
+  let didJustLoadFromHydration = !isInitial && version === 0
   let isInIncompleteHydration = state.status === Status.pending && version === 0
-  if (didLoadFromHydration) {
-    return React.createElement(extractedComponent, lastSuccess?.data?.props)
-  }
+
   if (isInIncompleteHydration) {
-    // todo: fix hydration
     throw new Error("Incomplete hydration state")
   }
-
   if (isInitial) {
-    throw source!.runp(component, context)
+    throw source!.runp(component, context);
   } else {
     let newContextEntries = Object.values(context)
     let prevInputs = lastSuccess!.props?.args! || []
     let prevContextEntries = Object.values(prevInputs[1] || {})
 
-    let didInputsChange = prevInputs[0] !== component
+    let didInputsChange = false
+
     if (newContextEntries.length !== prevContextEntries.length) {
       didInputsChange = true
-    }
-
-    for (let i = 0; i < prevContextEntries.length; i += 1) {
-      // @ts-ignore
-      if (newContextEntries[i] !== prevContextEntries[i]) {
-        didInputsChange = true
-        break;
+    } else {
+      for (let i = 0; i < prevContextEntries.length; i += 1) {
+        if (newContextEntries[i] !== prevContextEntries[i]) {
+          didInputsChange = true
+          break;
+        }
       }
     }
+
+    if (didInputsChange) {
+      throw source!.runp(component, context)
+    } else if (didJustLoadFromHydration) {
+      return React.createElement(extractedComponent, lastSuccess?.data?.props)
+    }
+
+    didInputsChange = (didInputsChange && prevInputs[0] !== component)
 
     if (didInputsChange) {
       throw source!.runp(component, context)
@@ -81,11 +86,14 @@ export function use(
 
   read() // throws in pending and error
 
+  if (didJustLoadFromHydration) {
+    return React.createElement(extractedComponent, lastSuccess?.data?.props)
+  }
+
   if (didSucceed) {
     if (isServer) {
-      console.log('returning in server !', lastSuccess!.data, context)
       return (
-        <Hydration context={context}>
+        <Hydration context={isServer ? context : staticObject}>
           {React.createElement(lastSuccess!.data!.type, lastSuccess!.data!.props)}
         </Hydration>
       )
@@ -112,6 +120,7 @@ export function SuspenseWrapper({children, fallback}) {
   )
 }
 
+let staticObject = {}
 export function UseAsyncComponent({
   componentKey,
   component,
@@ -133,7 +142,7 @@ export function UseAsyncComponent({
   }), [params, location.pathname, location.search])
 
   return (
-    <Hydration context={context}>
+    <Hydration context={isServer ? context : staticObject}>
       <UseImpl componentKey={componentKey} component={component}
                context={context} extractedComponent={extractedComponent}/>
     </Hydration>
@@ -212,7 +221,7 @@ export function RunSSRApp(routing) {
       <body>
       <div id="root">
         <React.StrictMode>
-          <Hydration context={request}>
+          <Hydration context={isServer ? request : staticObject}>
             <Application>
               <RouterProvider router={requestRouter}/>
             </Application>

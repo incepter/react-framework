@@ -1,8 +1,8 @@
-import {Get, Post, Render, Resource} from "../demo/src/decorators";
-import Users from "../demo/src/components/Users";
+import {Get, Post, Render, Resource} from "../decorators";
+import Users from "../components/Users";
 import * as React from "react";
-import UserPostsDetails from "../demo/src/components/UserPosts";
-import UserDetailsComponent from "../demo/src/components/UserDetailsComponent";
+import UserPostsDetails from "../components/UserPosts";
+import UserDetailsComponent from "../components/UserDetailsComponent";
 
 @Resource({path: "/users"})
 export class UserResource {

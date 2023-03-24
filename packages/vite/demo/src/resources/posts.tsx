@@ -18,11 +18,12 @@ export class PostResource {
   @UseServer()
   @Get({path: "/:id"})
   async PostDetails({ params }) {
-    let postDetails = await axios.get(`https://jsonplaceholder.typicode.com/posts/${params.id}`)
+    let posts = await axios.get(`https://jsonplaceholder.typicode.com/posts/${params.id}`)
+    let postDetails = posts.data;
     return (
       <details open>
         <pre>
-          {JSON.stringify(postDetails.data, null, 4)}
+          {JSON.stringify(postDetails, null, 4)}
         </pre>
       </details>
     )

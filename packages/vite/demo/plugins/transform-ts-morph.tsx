@@ -10,41 +10,6 @@ import {
   performFrameworkAPIExtractionOnFile
 } from "./helpers";
 
-
-function reconcileRouting(
-  routing: Record<string, FlatRouting>,
-  fileRouting: Record<string, FlatRouting>,
-  prevTrackedFileRouting: Record<string, FlatRouting> | undefined,
-  onRouteAlreadyExists?: (route: string) => void
-) {
-  if (prevTrackedFileRouting) {
-    for (let [httpMethod, routes] of Object.entries(prevTrackedFileRouting)) {
-      if (!routing[httpMethod]) {
-        continue
-      }
-      for (let [prevConfigPath, routeConfig] of Object.entries(routes)) {
-        if (routing[httpMethod][prevConfigPath]) {
-          delete routing[httpMethod][prevConfigPath]
-        }
-      }
-    }
-  }
-
-  for (let [httpMethod, routes] of Object.entries(fileRouting)) {
-    if (!routing[httpMethod]) {
-      routing[httpMethod] = routes
-      continue
-    }
-    let previousRoutes = routing[httpMethod]
-    for (let [newRoutePath, routeConfig] of Object.entries(routes)) {
-      if (previousRoutes[newRoutePath]) {
-        onRouteAlreadyExists?.(newRoutePath)
-      }
-      previousRoutes[newRoutePath] = routeConfig
-    }
-  }
-}
-
 /** @type {import('vite').UserConfig} */
 export default function transformTsMorph(): Plugin {
   let config;
@@ -57,21 +22,16 @@ export default function transformTsMorph(): Plugin {
   return {
     name: 'resource-plugin',
     async configResolved(configuration) {
+      project = new Project()
       config = configuration
       buildMode = resolveBuildMode(configuration)
       tempDir = path.join(config.root, 'src/.limitless')
-
-      prepareWorkDir(tempDir)
-
-      project = new Project()
       project.addSourceFilesAtPaths(config.root + '/src/**/*.tsx')
 
-
-      let filters = []
-
+      prepareWorkDir(tempDir)
       trackedFiles = scanTrackedFilesMap(project)
 
-      for (let [filePath, trackedFile] of trackedFiles.entries()) {
+      for (let trackedFile of trackedFiles.values()) {
         let prevTrackedFileRouting = trackedFile.routing
         trackedFile.routing = performFrameworkAPIExtractionOnFile(trackedFile.src)
         reconcileRouting(routing, trackedFile.routing, prevTrackedFileRouting)
@@ -82,15 +42,10 @@ export default function transformTsMorph(): Plugin {
       if (hasFrameworkAPI(file)) {
         let sourceFile = project.getSourceFile(file)
         sourceFile.refreshFromFileSystemSync()
-        if (trackedFiles.has(file)) {
-          let fileRouting = performFrameworkAPIExtractionOnFile(sourceFile)
-          reconcileRouting(routing, fileRouting, trackedFiles.get(file).routing)
-          constructBundle(config, project, routing, tempDir, buildMode)
-        } else {
-          let fileRouting = performFrameworkAPIExtractionOnFile(sourceFile)
-          reconcileRouting(routing, fileRouting, trackedFiles.get(file).routing)
-          constructBundle(config, project, routing, tempDir, buildMode)
-        }
+        let fileRouting = performFrameworkAPIExtractionOnFile(sourceFile)
+        let previousRegisteredRoutingOnFile = trackedFiles.get(file).routing
+        reconcileRouting(routing, fileRouting, previousRegisteredRoutingOnFile)
+        constructBundle(config, project, routing, tempDir, buildMode)
       }
     },
     async generateBundle() {
@@ -125,8 +80,6 @@ export default function transformTsMorph(): Plugin {
     }
     return doesFileContainAnyFrameworkAPIUsage(sourceFile)
   }
-
-
 }
 
 function scanTrackedFilesMap(project: Project) {
@@ -153,13 +106,7 @@ function resolveBuildMode(config): "csr" | "ssr" | "rsc" {
 }
 
 function doesFileContainAnyFrameworkAPIUsage(sourceFile) {
-  if (!sourceFile) {
-    console.warn(sourceFile.getFilePath(), 'is not a part of the "project".');
-    return false;
-  }
-
-  let fileClasses = sourceFile.getClasses()
-  return fileClasses.some(containsFrameworkAPIUsage)
+  return sourceFile.getClasses().some(containsFrameworkAPIUsage)
 }
 
 function prepareWorkDir(tempDir) {
@@ -168,4 +115,38 @@ function prepareWorkDir(tempDir) {
   fs.mkdirSync(tempDir + "/client", {recursive: true});
   fs.mkdirSync(tempDir + "/server", {recursive: true});
   fs.mkdirSync(tempDir + "/shared", {recursive: true});
+}
+
+function reconcileRouting(
+  routing: Record<string, FlatRouting>,
+  fileRouting: Record<string, FlatRouting>,
+  previouslyTrackedFileRouting: Record<string, FlatRouting> | undefined,
+  onRouteAlreadyExists?: (route: string) => void
+) {
+  if (previouslyTrackedFileRouting) {
+    for (let [httpMethod, routes] of Object.entries(previouslyTrackedFileRouting)) {
+      if (!routing[httpMethod]) {
+        continue
+      }
+      for (let [prevConfigPath] of Object.entries(routes)) {
+        if (routing[httpMethod][prevConfigPath]) {
+          delete routing[httpMethod][prevConfigPath]
+        }
+      }
+    }
+  }
+
+  for (let [httpMethod, routes] of Object.entries(fileRouting)) {
+    if (!routing[httpMethod]) {
+      routing[httpMethod] = routes
+      continue
+    }
+    let previousRoutes = routing[httpMethod]
+    for (let [newRoutePath, routeConfig] of Object.entries(routes)) {
+      if (previousRoutes[newRoutePath]) {
+        onRouteAlreadyExists?.(newRoutePath)
+      }
+      previousRoutes[newRoutePath] = routeConfig
+    }
+  }
 }
