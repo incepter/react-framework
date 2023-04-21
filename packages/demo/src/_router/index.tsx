@@ -228,7 +228,7 @@ function routerMatch(
     }
   }
 
-  console.log('here is the match', matchTree)
+  // console.log('here is the match', matchTree)
 
   return !Object.keys(matchTree.matches).length ? undefined : matchTree;
 }

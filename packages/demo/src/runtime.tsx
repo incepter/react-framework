@@ -2,7 +2,13 @@ import * as React from "react";
 import ReactDOM from "react-dom/client";
 import {Hydration, useAsyncState} from "react-async-states";
 
-import {ProducerProps, Status} from "async-states";
+import {
+  AsyncState,
+  createSource,
+  ProducerProps,
+  readSource,
+  Status
+} from "async-states";
 import {
   createBrowserRouter,
   createStaticRouter,
@@ -11,6 +17,7 @@ import {
   useCurrentRouteContext
 } from "./_router";
 import {AsyncComponentType} from "./decorators";
+import {useSyncExternalStore} from "react";
 
 async function limitlessUseProducer(
   props: ProducerProps<JSX.Element, Error, never, [AsyncComponentType, CurrentRouteContextType]>
@@ -30,76 +37,111 @@ export let isServer = typeof maybeWindow === "undefined" ||
   !maybeWindow.document.createElement;
 
 
+export function useInServer(
+  key: string,
+  component: AsyncComponentType,
+  context: CurrentRouteContextType, // framework context
+  extractedComponent,
+) {
+  if (!isServer) {
+    throw new Error("useInServer used in client")
+  }
+
+  let {state, source} = useAsyncState({key, producer: limitlessUseProducer}, [key])
+
+  let isInitial = source!.getState().status === Status.initial
+  if (isInitial) {
+    throw source!.runp(component, context)
+  }
+  if (state.status === Status.error) {
+    throw state.data
+  }
+
+  if (state.status !== Status.success) {
+    throw new Error("Should not be here")
+  }
+
+  return (
+    <Hydration context={context}>
+      {React.createElement(extractedComponent, state!.data!.props)}
+    </Hydration>
+  )
+}
+
+
+export function useInClient(
+  key: string,
+  component: AsyncComponentType,
+  context: CurrentRouteContextType, // framework context
+  extractedComponent,
+) {
+  if (isServer) {
+    throw new Error("useInClient used in server")
+  }
+
+  let {state, read, key: useKey} = useAsyncState({
+    key,
+    lazy: false,
+    producer: limitlessUseProducer,
+    skipPendingDelayMs: isServer ? 400 : undefined,
+    condition(state) {
+      return !isMount.current && computeDidInputsChange(state, context)
+    },
+    cacheConfig: {
+      enabled: !isServer,
+      hash: (args) => JSON.stringify(args?.[1]?.params || "root")
+    },
+  }, [key, context])
+
+  //
+  //
+  // let didInputsChange = computeDidInputsChange(source.getState()!, context)
+  // let didJustHydrate = version === 0 && state.status === Status.success
+  //
+  // if (didJustHydrate) {
+  //   return React.createElement(extractedComponent, lastSuccess!.data?.props)
+  // }
+  //
+  // if (didInputsChange) {
+  //   source!.run(component, context)
+  // }
+  read()
+
+  if (state.status !== Status.success) {
+    console.log('state is', key, state, useKey);
+    throw new Error("cannot proceed")
+  }
+
+  let isMount = React.useRef(true)
+  React.useEffect(() => {
+    isMount.current = false
+  }, [])
+
+  return React.createElement(extractedComponent, state.data.props)
+}
+
+function computeDidInputsChange(lastSuccess, context) {
+  let prevInputs = lastSuccess!.props?.args! || []
+  let previousContext = prevInputs[1]
+  let newLocation = context.match.location
+  let previousLocation = previousContext?.match.location
+
+  return (
+    newLocation.search !== previousLocation?.search ||
+    newLocation.pathname !== previousLocation?.pathname
+  )
+}
+
 export function use(
   key: string,
   component: AsyncComponentType,
   context: CurrentRouteContextType, // framework context
   extractedComponent,
 ): JSX.Element | null {
-  let ref = React.useRef(0)
-  ++ref.current
-  let {source, state, read, lastSuccess, version} = useAsyncState({
-    key,
-    // resetStateOnDispose: true,
-    producer: limitlessUseProducer,
-  }, [key])
-
-  let didSucceed = lastSuccess?.status === Status.success
-  let isInitial = source!.getState().status === Status.initial
-  let didJustLoadFromHydration = !isInitial && version === 0
-
-  let currentMatch = React.useContext(OutletBoundary)
-
-  if (!isServer) {
-    let isInIncompleteHydration = state.status === Status.pending && version === 0
-
-    if (isInIncompleteHydration) {
-      throw new Error("Incomplete hydration state")
-    }
+  if (isServer) {
+    return useInServer(key, component, context, extractedComponent)
   }
-
-  if (isInitial) {
-    console.log('running', key, source!.getState(), version, ref.current)
-    throw source!.runp(component, context);
-  } else {
-    let prevInputs = lastSuccess!.props?.args! || []
-
-    if (!prevInputs && didJustLoadFromHydration) {
-      return React.createElement(extractedComponent, lastSuccess?.data?.props)
-    }
-
-    let previousContext = prevInputs[1]
-    let newLocation = context.match.location
-    let previousLocation = previousContext.match.location
-
-    if (newLocation.search !== previousLocation.search ||
-      newLocation.pathname !== previousLocation.pathname) {
-      console.log('running2', currentMatch, key, newLocation.search, previousLocation.search, newLocation.pathname, previousLocation.pathname, previousContext.params, context.params)
-      throw source!.runp(component, context)
-    }
-
-    if (didJustLoadFromHydration) {
-      return React.createElement(extractedComponent, lastSuccess?.data?.props)
-    }
-  }
-
-  read() // throws in pending and error
-
-  if (didJustLoadFromHydration) {
-    return React.createElement(extractedComponent, lastSuccess?.data?.props)
-  }
-
-  if (didSucceed) {
-    if (isServer) {
-      return (
-        <Hydration context={context}>
-          {React.createElement(lastSuccess!.data!.type, lastSuccess!.data!.props)}
-        </Hydration>
-      )
-    }
-    return lastSuccess!.data!
-  }
-  throw new Error("Should not be here");
+  return useInClient(key, component, context, extractedComponent)
 }
 
 function UseImpl({
@@ -132,8 +174,10 @@ export function UseAsyncComponent({
 }) {
   let context = useCurrentRouteContext()
   return (
-    <UseImpl componentKey={componentKey} component={component}
-             context={context} extractedComponent={extractedComponent}/>
+    <Hydration exclude={(key, state) => state.status !== Status.success} context={context}>
+      <UseImpl componentKey={componentKey} component={component}
+               context={context} extractedComponent={extractedComponent}/>
+    </Hydration>
   )
 }
 
